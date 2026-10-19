@@ -80,5 +80,22 @@ class ModelLanguageLabelTests(unittest.TestCase):
         self.assertEqual(unknown.from_display_name, "X language")
 
 
+class RegisteredVietnameseModelUrlTests(unittest.TestCase):
+    def test_vietnamese_model_urls_pin_the_live_versioned_storage_paths(self):
+        expected_paths = {
+            "vien": "/models/vi-en/spring-2024_Nc0SHbrgQaiFt4_FmKBXOA/exported/",
+            "envi": "/models/en-vi/test_prompsit_Ep8JhBQ3QRizDT91JVy8KQ/exported/",
+        }
+        data_directory = Path(__file__).resolve().parents[1] / "data"
+        for relative_path in (Path("models/registry.json"), Path("registry.json")):
+            registry = json.loads((data_directory / relative_path).read_text(encoding="utf-8"))
+            packages = {item["pair"]: item for item in registry["models"]}
+            with self.subTest(registry=relative_path):
+                for pair, expected_path in expected_paths.items():
+                    urls = [item["url"] for item in packages[pair]["files"]]
+                    self.assertEqual(len(urls), 3)
+                    self.assertTrue(all(expected_path in url for url in urls), pair)
+
+
 if __name__ == "__main__":
     unittest.main()

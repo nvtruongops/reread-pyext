@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -19,6 +20,7 @@ from .logger import AppLogger, setup_global_logging
 from .paths import app_data_dir, migrate_legacy_data, models_dir, node_executable, resource_path
 from .ui.main_window import APP_STYLE, PAGE_HISTORY, PAGE_SETTINGS, MainWindow
 from .ui.first_run_setup import FirstRunSetupDialog
+from .ui.translations import set_ui_language, translate
 from .ui.tooltip import FloatingTooltip
 from .uninstall_cleanup import cleanup_installed_data
 
@@ -37,7 +39,7 @@ class AppSignals(QObject):
 
 
 class RereadDesktopApp(QObject):
-    def __init__(self, background: bool = False) -> None:
+    def __init__(self, background: bool = False, initial_language: str | None = None) -> None:
         self.application = QApplication.instance() or QApplication(sys.argv[:1])
         self.application.setApplicationName("re/read Desktop")
         self.application.setOrganizationName("re/read")
@@ -55,10 +57,11 @@ class RereadDesktopApp(QObject):
         self.settings_mgr = SettingsManager()
         self._setup_cancelled = False
         if not self.settings_mgr.config.setup_complete:
-            setup_dialog = FirstRunSetupDialog(self.settings_mgr)
+            setup_dialog = FirstRunSetupDialog(self.settings_mgr, preferred_language=initial_language)
             if setup_dialog.exec() != QDialog.DialogCode.Accepted:
                 self._setup_cancelled = True
                 return
+        set_ui_language(self.settings_mgr.config.ui_language)
 
         self.logger: AppLogger = setup_global_logging()
         for path in copied:
@@ -88,13 +91,13 @@ class RereadDesktopApp(QObject):
         self.tooltip.set_auto_close_seconds(self.settings_mgr.config.auto_close_seconds)
 
         self.tray = QSystemTrayIcon(icon, self.application)
-        self.tray.setToolTip("re/read Desktop · Đang khởi động")
+        self.tray.setToolTip(f"re/read Desktop · {translate('Đang khởi động…')}")
         tray_menu = QMenu()
-        open_action = QAction("Mở re/read", self.tray)
+        open_action = QAction(translate("Mở re/read"), self.tray)
         open_action.triggered.connect(self.show_main_window)
-        self.pause_action = QAction("Tạm dừng", self.tray)
+        self.pause_action = QAction(translate("Tạm dừng"), self.tray)
         self.pause_action.triggered.connect(self.toggle_pause)
-        quit_action = QAction("Thoát", self.tray)
+        quit_action = QAction(translate("Thoát"), self.tray)
         quit_action.triggered.connect(self.shutdown)
         tray_menu.addAction(open_action)
         tray_menu.addAction(self.pause_action)
@@ -117,6 +120,7 @@ class RereadDesktopApp(QObject):
         self.signals.translated.connect(self._show_translation, Qt.ConnectionType.QueuedConnection)
         self.main_window.pause_requested.connect(self.toggle_pause)
         self.main_window.quit_requested.connect(self.shutdown)
+        self.main_window.uninstall_requested.connect(self.start_uninstaller)
         self.main_window.manual_translation_requested.connect(self._handle_manual_translation)
         self.settings_mgr.add_listener(self._on_settings_updated)
 
@@ -154,7 +158,7 @@ class RereadDesktopApp(QObject):
     def _set_kernel_status(self, message: str, ready: bool) -> None:
         self.kernel_ready = ready
         self.main_window.set_status(message, ready)
-        self.tray.setToolTip(f"re/read Desktop · {message}")
+        self.tray.setToolTip(f"re/read Desktop · {translate(message)}")
 
     @Slot(str, int, int, str)
     def _handle_selection(self, text: str, mouse_x: int, mouse_y: int, source: str) -> None:
@@ -252,7 +256,7 @@ class RereadDesktopApp(QObject):
         if hasattr(self, "hook"):
             self.hook.set_paused(self._paused)
         self.main_window.set_paused(self._paused)
-        self.pause_action.setText("Tiếp tục" if self._paused else "Tạm dừng")
+        self.pause_action.setText(translate("Tiếp tục" if self._paused else "Tạm dừng"))
         self.logger.info("Selection translation paused." if self._paused else "Selection translation resumed.")
 
     @Slot(QSystemTrayIcon.ActivationReason)
@@ -283,6 +287,26 @@ class RereadDesktopApp(QObject):
         self.tooltip.hide()
         self.application.quit()
 
+    def start_uninstaller(self) -> None:
+        uninstaller = Path(sys.executable).resolve().with_name("unins000.exe")
+        if not uninstaller.is_file():
+            QMessageBox.warning(
+                self.main_window,
+                translate("Gỡ cài đặt"),
+                translate("Không tìm thấy trình gỡ cài đặt trong thư mục ứng dụng."),
+            )
+            return
+        try:
+            subprocess.Popen([str(uninstaller), "/SILENT"], cwd=uninstaller.parent)
+        except OSError as exc:
+            QMessageBox.warning(
+                self.main_window,
+                translate("Gỡ cài đặt"),
+                translate("Không thể mở trình gỡ cài đặt: ") + str(exc),
+            )
+            return
+        self.shutdown()
+
     def run(self) -> int:
         if self._setup_cancelled:
             return 0
@@ -292,6 +316,7 @@ class RereadDesktopApp(QObject):
 def main() -> int:
     parser = argparse.ArgumentParser(description="re/read offline desktop translator")
     parser.add_argument("--background", action="store_true", help="start minimized to the system tray")
+    parser.add_argument("--ui-language", choices=("vi", "en"), help=argparse.SUPPRESS)
     parser.add_argument("--uninstall-cleanup", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--report-path", help=argparse.SUPPRESS)
     args, qt_args = parser.parse_known_args()
@@ -307,7 +332,7 @@ def main() -> int:
             QApplication.instance() or QApplication(sys.argv[:1])
             QMessageBox.warning(None, "re/read · Gỡ cài đặt", "\n".join(errors))
         return 0
-    app = RereadDesktopApp(background=args.background)
+    app = RereadDesktopApp(background=args.background, initial_language=args.ui_language)
     return app.run()
 
 

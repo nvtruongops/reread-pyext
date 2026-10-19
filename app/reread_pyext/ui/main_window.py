@@ -46,6 +46,7 @@ from ..config.settings import AppConfig, SettingsManager
 from ..config.startup import StartupManager
 from ..logger import AppLogger
 from ..paths import app_data_dir, models_dir, resource_path
+from .translations import localize_widgets, set_ui_language, translate, ui_language
 
 
 PAGE_OVERVIEW, PAGE_HISTORY, PAGE_MODELS, PAGE_SETTINGS, PAGE_ACTIVITY = range(5)
@@ -60,6 +61,8 @@ TARGETS = [
 
 APP_STYLE = """
 QMainWindow, QWidget#appRoot { background: #f3f6f4; color: #1d2927; }
+QDialog { background: #f3f6f4; color: #1d2927; }
+QDialog QLabel { color: #1d2927; background: transparent; }
 QStackedWidget, QScrollArea, QWidget#desktopPageContent, QWidget#settingsPage { background: #f3f6f4; }
 QWidget { font-family: "Segoe UI"; font-size: 10pt; color: #1d2927; }
 QFrame#sidebar { background: #17312e; border: none; }
@@ -165,11 +168,11 @@ def _confirm_action(
     dialog = QMessageBox(parent)
     dialog.setIcon(QMessageBox.Icon.Question)
     dialog.setWindowTitle(APP_NAME)
-    dialog.setText(message)
+    dialog.setText(translate(message))
     if details:
-        dialog.setInformativeText(details)
-    confirm_button = dialog.addButton(confirm_label, QMessageBox.ButtonRole.DestructiveRole)
-    cancel_button = dialog.addButton("Hủy", QMessageBox.ButtonRole.RejectRole)
+        dialog.setInformativeText(translate(details))
+    confirm_button = dialog.addButton(translate(confirm_label), QMessageBox.ButtonRole.DestructiveRole)
+    cancel_button = dialog.addButton(translate("Hủy"), QMessageBox.ButtonRole.RejectRole)
     dialog.setDefaultButton(cancel_button)
     dialog.setEscapeButton(cancel_button)
     _style_message_box(dialog)
@@ -452,7 +455,7 @@ class HomePage(QWidget):
         self.target_combo.clear()
         for label, code in TARGETS:
             if code in installed_targets:
-                self.target_combo.addItem(label, code)
+                self.target_combo.addItem(translate(label), code)
         if self.target_combo.count():
             index = self.target_combo.findData(self.settings.config.target_lang)
             if index < 0:
@@ -461,7 +464,7 @@ class HomePage(QWidget):
             self.target_combo.setCurrentIndex(index)
             self.target_combo.setEnabled(True)
         else:
-            self.target_combo.addItem("Chưa có mô hình đã cài", None)
+            self.target_combo.addItem(translate("Chưa có mô hình đã cài"), None)
             self.target_combo.setEnabled(False)
         self.target_combo.blockSignals(False)
         if installed:
@@ -469,10 +472,11 @@ class HomePage(QWidget):
             self.models_status.hide()
             self.install_models_button.hide()
         else:
-            self.models_status.setText("Chưa có mô hình. Cài một lần để bắt đầu dịch ngoại tuyến.")
+            self.models_status.setText(translate("Chưa có mô hình. Cài một lần để bắt đầu dịch ngoại tuyến."))
             self.quick_start_card.show()
             self.models_status.show()
             self.install_models_button.show()
+        localize_widgets(self)
 
     def _target_changed(self) -> None:
         target_lang = self.target_combo.currentData()
@@ -492,7 +496,7 @@ class HomePage(QWidget):
         text = self.output.toPlainText()
         if text:
             QApplication.clipboard().setText(text)
-            self.output_status.setText("Đã sao chép bản dịch.")
+            self.output_status.setText(translate("Đã sao chép bản dịch."))
 
     def clear_workspace(self) -> None:
         self.input.clear()
@@ -506,18 +510,18 @@ class HomePage(QWidget):
         if text:
             self.output.clear()
             self.copy_button.setEnabled(False)
-            self.output_status.setText("Đang dịch…")
+            self.output_status.setText(translate("Đang dịch…"))
             self.translate_button.setEnabled(False)
             self.translate_requested.emit(text)
 
     def set_kernel_status(self, message: str, ready: bool) -> None:
         self._ready = ready
-        self.input_status.setText("Lõi sẵn sàng · văn bản được xử lý trên máy" if ready else message)
+        self.input_status.setText(translate("Lõi sẵn sàng · văn bản được xử lý trên máy") if ready else translate(message))
         self.translate_button.setEnabled(ready and bool(self.input.toPlainText().strip()))
 
     def show_result(self, translated_text: str, error: str = "") -> None:
-        self.output.setPlainText(error or translated_text or "Không có bản dịch.")
-        self.output_status.setText(error if error else ("Dịch xong." if translated_text else ""))
+        self.output.setPlainText(translate(error) if error else translated_text or translate("Không có bản dịch."))
+        self.output_status.setText(translate(error) if error else (translate("Dịch xong.") if translated_text else ""))
         self.copy_button.setEnabled(bool(translated_text and not error))
         self.clear_button.setEnabled(bool(self.input.toPlainText().strip() or translated_text or error))
         self.translate_button.setEnabled(self._ready and bool(self.input.toPlainText().strip()))
@@ -566,10 +570,14 @@ class HistoryPage(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         entries = self.history.get_items()
-        self.count.setText(f"{len(entries)} mục")
+        count_unit = "mục" if ui_language() == "vi" else ("item" if len(entries) == 1 else "items")
+        self.count.setText(f"{len(entries)} {count_unit}")
         self.clear_button.setEnabled(bool(entries))
         if not entries:
-            empty = QLabel("Chưa có bản dịch nào\nBản dịch mới sẽ xuất hiện tại đây khi bật lưu lịch sử.")
+            empty = QLabel(
+                f"{translate('Chưa có bản dịch nào')}\n"
+                f"{translate('Bản dịch mới sẽ xuất hiện tại đây khi bật lưu lịch sử.')}"
+            )
             empty.setObjectName("emptyState")
             empty.setWordWrap(True)
             self.list_layout.addWidget(empty)
@@ -586,11 +594,13 @@ class HistoryPage(QWidget):
             source_label = QLabel("Văn bản gốc")
             source_label.setObjectName("eyebrow")
             source = QLabel(entry.source_text)
+            source.setObjectName("historyContentText")
             source.setObjectName("muted")
             source.setWordWrap(True)
             target_label = QLabel("Bản dịch")
             target_label.setObjectName("eyebrow")
             target = QLabel(entry.translated_text)
+            target.setObjectName("historyContentText")
             target.setWordWrap(True)
             target.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             copy_button = QPushButton("Sao chép bản dịch")
@@ -603,6 +613,7 @@ class HistoryPage(QWidget):
             layout.addWidget(copy_button, 0, Qt.AlignmentFlag.AlignRight)
             self.list_layout.addWidget(frame)
         self.list_layout.addStretch(1)
+        localize_widgets(self)
 
     def _clear(self) -> None:
         confirmed = _confirm_action(
@@ -622,10 +633,10 @@ class HistoryPage(QWidget):
 
         notice = QMessageBox(self)
         notice.setIcon(QMessageBox.Icon.Information)
-        notice.setWindowTitle("Lịch sử đã được xóa")
-        notice.setText(f"Đã xóa {len(items)} bản dịch.")
-        undo_button = notice.addButton("Hoàn tác", QMessageBox.ButtonRole.ActionRole)
-        notice.addButton("Đóng", QMessageBox.ButtonRole.AcceptRole)
+        notice.setWindowTitle(translate("Lịch sử đã được xóa"))
+        notice.setText(f"{translate('Đã xóa ')}{len(items)}{translate(' bản dịch.')}")
+        undo_button = notice.addButton(translate("Hoàn tác"), QMessageBox.ButtonRole.ActionRole)
+        notice.addButton(translate("Đóng"), QMessageBox.ButtonRole.AcceptRole)
         _style_message_box(notice)
         notice.exec()
         if notice.clickedButton() == undo_button:
@@ -713,10 +724,10 @@ class ModelPage(QWidget):
         for package in visible:
             size = package.installed_size_mb if package.is_installed else package.download_size_mb
             if package.underlying_pair:
-                status = "✓ SẴN SÀNG" if package.is_installed else f"Có thể tải  ·  {size:.1f} MB"
+                status = translate("✓ SẴN SÀNG") if package.is_installed else f"{translate('Có thể tải')}  ·  {size:.1f} MB"
             else:
-                status = f"✓ ĐÃ CÀI  ·  {size:.1f} MB" if package.is_installed else f"Có thể tải  ·  {size:.1f} MB"
-            route = f"{package.from_display_name} → {package.to_display_name}"
+                status = f"{translate('✓ ĐÃ CÀI')}  ·  {size:.1f} MB" if package.is_installed else f"{translate('Có thể tải')}  ·  {size:.1f} MB"
+            route = translate(f"{package.from_display_name} → {package.to_display_name}")
             route_codes = f"{package.from_lang.upper()} → {package.to_lang.upper()}"
             item = QListWidgetItem(f"{route}\n{route_codes}\n{status}")
             item.setSizeHint(QSize(300, 82))
@@ -747,18 +758,18 @@ class ModelPage(QWidget):
         self.download_button.setVisible(bool(package and not package.is_installed))
         self.delete_button.setVisible(bool(package and package.is_installed and not package.underlying_pair))
         if package is None:
-            self.detail_title.setText("Chưa có mô hình phù hợp")
+            self.detail_title.setText(translate("Chưa có mô hình phù hợp"))
             self.detail_text.clear()
             return
-        self.detail_title.setText(f"{package.from_display_name} → {package.to_display_name}")
+        self.detail_title.setText(translate(f"{package.from_display_name} → {package.to_display_name}"))
         route_codes = f"{package.from_lang.upper()} → {package.to_lang.upper()}"
         if package.underlying_pair:
-            status = "Sẵn sàng" if package.is_installed else "Chưa cài"
+            status = translate("Sẵn sàng" if package.is_installed else "Chưa cài")
             self.detail_text.setText(f"{route_codes}\n{status}")
             return
         size = package.installed_size_mb if package.is_installed else package.download_size_mb
-        size_label = f"{size:.1f} MB trên đĩa" if package.is_installed else f"Tải xuống khoảng {size:.1f} MB"
-        status = "Đã cài" if package.is_installed else "Chưa cài"
+        size_label = f"{size:.1f} {translate('MB trên đĩa')}" if package.is_installed else f"{translate('Tải xuống khoảng ')}{size:.1f} MB"
+        status = translate("Đã cài" if package.is_installed else "Chưa cài")
         self.detail_text.setText(f"{route_codes}\n{status}  ·  {size_label}")
 
     def _download(self) -> None:
@@ -768,7 +779,7 @@ class ModelPage(QWidget):
         self.download_button.setEnabled(False)
         self.progress.setValue(0)
         self.progress.show()
-        self.operation_status.setText("Đang tải mô hình…")
+        self.operation_status.setText(translate("Đang tải mô hình…"))
 
         from PySide6.QtCore import QObject
 
@@ -796,13 +807,13 @@ class ModelPage(QWidget):
     def _download_complete(self, pair: str) -> None:
         self.download_button.setEnabled(True)
         self.progress.hide()
-        self.operation_status.setText(f"Đã cài mô hình {pair.upper()}.")
+        self.operation_status.setText(f"{translate('Đã cài ')}{translate('mô hình')} {pair.upper()}.")
         self.refresh()
 
     def _download_error(self, pair: str, error: str) -> None:
         self.download_button.setEnabled(True)
         self.progress.hide()
-        self.operation_status.setText(f"Không thể tải {pair.upper()}: {error}")
+        self.operation_status.setText(f"{translate('Không thể tải ')}{pair.upper()}: {error}")
 
     def _delete(self) -> None:
         package = self._selected_package()
@@ -810,9 +821,9 @@ class ModelPage(QWidget):
             return
         confirmed = _confirm_action(
             self,
-            f"Gỡ mô hình {package.pair.upper()} khỏi máy?",
-            "Gỡ mô hình",
-            "Bạn có thể tải lại sau.",
+            f"{translate('Gỡ mô hình ')}{package.pair.upper()}{translate(' khỏi máy?')}",
+            translate("Gỡ mô hình"),
+            translate("Bạn có thể tải lại sau."),
         )
         if not confirmed:
             return
@@ -827,6 +838,7 @@ class ModelPage(QWidget):
 
 class SettingsPage(QWidget):
     saved = Signal(object)
+    uninstall_requested = Signal()
 
     def __init__(self, settings: SettingsManager) -> None:
         super().__init__()
@@ -849,6 +861,13 @@ class SettingsPage(QWidget):
         title = QLabel("Cài đặt")
         title.setObjectName("heroTitle")
         body_layout.addWidget(title)
+
+        language_card, language_layout = _card("Ngôn ngữ giao diện")
+        self.ui_language = QComboBox()
+        self.ui_language.addItem("Tiếng Việt", "vi")
+        self.ui_language.addItem("English", "en")
+        self._form_row(language_layout, "Ngôn ngữ giao diện", self.ui_language)
+        body_layout.addWidget(language_card)
 
         behavior, behavior_layout = _card("Cách dịch", "Chọn hành vi khi thao tác trên ứng dụng khác.")
         self.auto_drag = AppCheckBox("Giữ chuột để dịch")
@@ -907,6 +926,7 @@ class SettingsPage(QWidget):
 
         storage, storage_layout = _card("Dữ liệu ứng dụng")
         self.data_path = QLabel(str(database_path()))
+        self.data_path.setObjectName("dataPath")
         self.data_path.setWordWrap(True)
         self.data_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         open_data = QPushButton("Mở thư mục dữ liệu")
@@ -932,6 +952,16 @@ class SettingsPage(QWidget):
         self.model_directory_hint.setWordWrap(True)
         storage_layout.addWidget(self.model_directory_hint)
         body_layout.addWidget(storage)
+
+        uninstall, uninstall_layout = _card(
+            "Gỡ cài đặt re/read",
+            "Gỡ ứng dụng cùng lịch sử, cài đặt và toàn bộ mô hình đã tải.",
+        )
+        self.uninstall_button = QPushButton("Gỡ cài đặt")
+        self.uninstall_button.setObjectName("dangerButton")
+        self.uninstall_button.clicked.connect(self._request_uninstall)
+        uninstall_layout.addWidget(self.uninstall_button, 0, Qt.AlignmentFlag.AlignLeft)
+        body_layout.addWidget(uninstall)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -968,6 +998,7 @@ class SettingsPage(QWidget):
             self.auto_close_delay.valueChanged,
             self.save_history.toggled,
             self.start_on_boot.toggled,
+            self.ui_language.currentIndexChanged,
         ):
             signal.connect(self._update_dirty_state)
         self.auto_close_enabled.toggled.connect(self.auto_close_delay.setEnabled)
@@ -1007,6 +1038,8 @@ class SettingsPage(QWidget):
         self.auto_close_delay.setEnabled(self.auto_close_enabled.isChecked())
         self.save_history.setChecked(cfg.enable_history)
         self.start_on_boot.setChecked(cfg.start_on_boot)
+        language_index = self.ui_language.findData(cfg.ui_language)
+        self.ui_language.setCurrentIndex(max(0, language_index))
         self.model_directory.setText(str(models_dir(cfg.model_directory)))
         self._startup_registered, _name, _command = self.startup.is_registered()
         self._refresh_startup_status()
@@ -1014,6 +1047,7 @@ class SettingsPage(QWidget):
         self._loading = False
         self.feedback.clear()
         self._update_dirty_state()
+        localize_widgets(self)
 
     @property
     def is_dirty(self) -> bool:
@@ -1028,6 +1062,7 @@ class SettingsPage(QWidget):
             "auto_close_seconds": self.auto_close_delay.value() if self.auto_close_enabled.isChecked() else 0,
             "enable_history": self.save_history.isChecked(),
             "start_on_boot": self.start_on_boot.isChecked(),
+            "ui_language": str(self.ui_language.currentData()),
             "model_directory": self.model_directory.text().strip(),
         }
 
@@ -1035,7 +1070,7 @@ class SettingsPage(QWidget):
         if self._loading:
             return
         dirty = self.is_dirty
-        self.dirty_status.setText("Có thay đổi chưa lưu" if dirty else "Mọi thay đổi đã được lưu")
+        self.dirty_status.setText(translate("Có thay đổi chưa lưu" if dirty else "Mọi thay đổi đã được lưu"))
         self.dirty_status.setProperty("dirty", dirty)
         self.dirty_status.style().unpolish(self.dirty_status)
         self.dirty_status.style().polish(self.dirty_status)
@@ -1047,23 +1082,24 @@ class SettingsPage(QWidget):
     def _refresh_startup_status(self, *_args) -> None:
         wants_startup = self.start_on_boot.isChecked()
         if wants_startup and not self._startup_registered:
-            text = "Lưu thay đổi sẽ đăng ký chạy nền khi đăng nhập Windows."
+            text = translate("Lưu thay đổi sẽ đăng ký chạy nền khi đăng nhập Windows.")
         elif not wants_startup and self._startup_registered:
-            text = "Lưu thay đổi sẽ gỡ mục tự khởi động của re/read."
+            text = translate("Lưu thay đổi sẽ gỡ mục tự khởi động của re/read.")
         elif self._startup_registered:
-            text = "Đã đăng ký khởi động cùng Windows."
+            text = translate("Đã đăng ký khởi động cùng Windows.")
         else:
-            text = "Ứng dụng không tự chạy khi đăng nhập Windows."
+            text = translate("Ứng dụng không tự chạy khi đăng nhập Windows.")
         self.startup_status.setText(text)
 
     def _undo(self) -> None:
         self.load()
-        self.feedback.setText("Đã hoàn tác thay đổi.")
+        self.feedback.setText(translate("Đã hoàn tác thay đổi."))
 
     def _save(self) -> None:
         model_directory = models_dir(self.model_directory.text().strip()).resolve()
         current_model_directory = models_dir(self.settings.config.model_directory).resolve()
         model_directory_changed = model_directory != current_model_directory
+        language_changed = str(self.ui_language.currentData()) != self.settings.config.ui_language
         try:
             if model_directory.exists() and not model_directory.is_dir():
                 raise NotADirectoryError(str(model_directory))
@@ -1071,9 +1107,9 @@ class SettingsPage(QWidget):
         except OSError as exc:
             warning = QMessageBox(self)
             warning.setIcon(QMessageBox.Icon.Warning)
-            warning.setWindowTitle("Không thể dùng thư mục mô hình")
-            warning.setText(f"Không thể tạo hoặc mở thư mục đã chọn: {exc}")
-            warning.addButton("Đóng", QMessageBox.ButtonRole.AcceptRole)
+            warning.setWindowTitle(translate("Không thể dùng thư mục mô hình"))
+            warning.setText(f"{translate('Không thể tạo hoặc mở thư mục đã chọn: ')}{exc}")
+            warning.addButton(translate("Đóng"), QMessageBox.ButtonRole.AcceptRole)
             _style_message_box(warning)
             warning.exec()
             return
@@ -1089,9 +1125,9 @@ class SettingsPage(QWidget):
         if not startup_ok:
             warning = QMessageBox(self)
             warning.setIcon(QMessageBox.Icon.Warning)
-            warning.setWindowTitle("Không thể cập nhật khởi động")
+            warning.setWindowTitle(translate("Không thể cập nhật khởi động"))
             warning.setText(startup_message)
-            warning.addButton("Đóng", QMessageBox.ButtonRole.AcceptRole)
+            warning.addButton(translate("Đóng"), QMessageBox.ButtonRole.AcceptRole)
             _style_message_box(warning)
             warning.exec()
             self.start_on_boot.setChecked(self.settings.config.start_on_boot)
@@ -1102,14 +1138,16 @@ class SettingsPage(QWidget):
         self.settings.update(**values)
         self.saved.emit(self.settings.config)
         self.load()
-        if not wants_startup and registered:
-            message = "Đã tắt khởi động và gỡ mục đăng ký của re/read."
+        if language_changed:
+            message = translate("Khởi động lại ứng dụng để áp dụng ngôn ngữ mới.", str(values["ui_language"]))
+        elif not wants_startup and registered:
+            message = translate("Đã tắt khởi động và gỡ mục đăng ký của re/read.")
         elif wants_startup and not registered:
-            message = "Đã bật khởi động cùng Windows."
+            message = translate("Đã bật khởi động cùng Windows.")
         else:
-            message = "Đã lưu cài đặt."
+            message = translate("Đã lưu cài đặt.")
         if model_directory_changed:
-            message += " Mở lại ứng dụng để dùng thư mục mô hình mới."
+            message += translate(" Mở lại ứng dụng để dùng thư mục mô hình mới.")
         self.feedback.setText(message)
 
     def _choose_model_directory(self) -> None:
@@ -1117,7 +1155,7 @@ class SettingsPage(QWidget):
         start_directory = current if current.is_dir() else current.parent
         selected = QFileDialog.getExistingDirectory(
             self,
-            "Chọn thư mục lưu mô hình",
+            translate("Chọn thư mục lưu mô hình"),
             str(start_directory),
         )
         if selected:
@@ -1127,6 +1165,18 @@ class SettingsPage(QWidget):
     def _open_data_dir(self) -> None:
         app_data_dir().mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(app_data_dir())))
+
+    def _request_uninstall(self) -> None:
+        if self.is_dirty:
+            self.feedback.setText(translate("Lưu cài đặt trước khi gỡ ứng dụng."))
+            return
+        if _confirm_action(
+            self,
+            "Gỡ cài đặt re/read khỏi máy tính?",
+            "Gỡ cài đặt",
+            "Toàn bộ ứng dụng, lịch sử, cài đặt và mô hình đã tải sẽ bị xóa.",
+        ):
+            self.uninstall_requested.emit()
 
 
 class ActivityPage(QWidget):
@@ -1191,6 +1241,7 @@ class ActivityPage(QWidget):
 class MainWindow(QMainWindow):
     pause_requested = Signal()
     quit_requested = Signal()
+    uninstall_requested = Signal()
 
     def __init__(
         self,
@@ -1202,6 +1253,7 @@ class MainWindow(QMainWindow):
     ) -> None:
         super().__init__()
         self.settings = settings
+        set_ui_language(settings.config.ui_language)
         self.tray_available = tray_available
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(900, 620)
@@ -1297,12 +1349,14 @@ class MainWindow(QMainWindow):
         self.home.translate_requested.connect(self.manual_translation_requested.emit)
         self.home.models_requested.connect(lambda: self.show_page(PAGE_MODELS))
         self.home.settings_requested.connect(lambda: self.show_page(PAGE_SETTINGS))
+        self.settings_page.uninstall_requested.connect(self.uninstall_requested.emit)
+        localize_widgets(self)
 
     def show_page(self, index: int) -> None:
         if hasattr(self, "activity_page"):
             self.activity_page.set_active(index == PAGE_ACTIVITY)
         self.pages.setCurrentIndex(index)
-        self.page_title.setText(self.page_widgets[index][0])
+        self.page_title.setText(translate(self.page_widgets[index][0]))
         if index == PAGE_OVERVIEW:
             self.home.refresh_details()
         for row, button in enumerate(self.nav_buttons):
@@ -1319,18 +1373,18 @@ class MainWindow(QMainWindow):
     manual_translation_requested = Signal(str)
 
     def set_status(self, message: str, ready: bool = False) -> None:
-        self.status.setText(message)
-        self.home.set_kernel_status(message, ready)
+        self.status.setText(translate(message))
+        self.home.set_kernel_status(translate(message), ready)
         self.pause_button.setEnabled(ready)
 
     def set_paused(self, paused: bool) -> None:
-        self.pause_button.setText("Tiếp tục" if paused else "Tạm dừng")
-        self.status.setText("Đang tạm dừng" if paused else "Đang hoạt động")
+        self.pause_button.setText(translate("Tiếp tục" if paused else "Tạm dừng"))
+        self.status.setText(translate("Đang tạm dừng" if paused else "Đang hoạt động"))
 
     def show_result(self, translated_text: str, error: str = "") -> None:
         self.home.show_result(translated_text, error)
         if error:
-            self.status.setText("Không dịch được văn bản")
+            self.status.setText(translate("Không dịch được văn bản"))
 
     def refresh_history(self) -> None:
         self.history_page.refresh()

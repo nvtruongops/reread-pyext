@@ -58,17 +58,22 @@ def main() -> int:
     palette.setColor(QPalette.ColorRole.Window, QColor("#1e1e1e"))
     palette.setColor(QPalette.ColorRole.Base, QColor("#2d2d2d"))
     app.setPalette(palette)
+    app.setStyleSheet(APP_STYLE)
     with tempfile.TemporaryDirectory(prefix="reread-qt-smoke-") as temp_dir:
         data = Path(temp_dir)
         setup_settings = SettingsManager(config_path=data / "first-run-config.json")
         selected_models = data / "selected-models"
         setup_dialog = FirstRunSetupDialog(setup_settings)
+        assert [setup_dialog.language_combo.itemData(i) for i in range(setup_dialog.language_combo.count())] == ["vi", "en"]
         setup_dialog.directory_edit.setText(str(selected_models))
+        setup_dialog.language_combo.setCurrentIndex(1)
 
         def complete_first_run_setup() -> None:
+            image = setup_dialog.grab().toImage()
+            assert image.pixelColor(5, 5).name() == "#f3f6f4"
             button = next(
                 button for button in setup_dialog.findChildren(QPushButton)
-                if button.text() == "Hoàn tất thiết lập"
+                if button.property("setupAction") == "finish"
             )
             button.click()
 
@@ -76,6 +81,7 @@ def main() -> int:
         assert setup_dialog.exec() == QDialog.DialogCode.Accepted
         assert setup_settings.config.setup_complete
         assert setup_settings.config.model_directory == str(selected_models)
+        assert setup_settings.config.ui_language == "en"
         assert selected_models.is_dir() and list(selected_models.iterdir()) == []
 
         settings = SettingsManager(config_path=data / "config.json")
@@ -121,6 +127,13 @@ def main() -> int:
         assert any("Ctrl+V hai lần" in label for label in home_labels)
         assert window.home.settings_button.text() == "Chọn nơi lưu"
         assert window.home.layout().itemAt(1).widget() is window.home.quick_start_card
+        assert [window.settings_page.ui_language.itemData(i) for i in range(window.settings_page.ui_language.count())] == ["vi", "en"]
+        assert window.settings_page.uninstall_button.text() == "Gỡ cài đặt"
+        uninstall_requests = []
+        window.uninstall_requested.connect(lambda: uninstall_requests.append(True))
+        with patch("reread_pyext.ui.main_window._confirm_action", return_value=True):
+            window.settings_page.uninstall_button.click()
+        assert uninstall_requests == [True]
         window.home.install_models_button.click()
         app.processEvents()
         assert window.pages.currentIndex() == PAGE_MODELS
@@ -476,6 +489,42 @@ def main() -> int:
         assert shown == [result]
         tooltip.hide()
         window.close()
+        english_settings = SettingsManager(config_path=data / "english-config.json")
+        english_settings.update(ui_language="en", model_directory=str(data / "english-models"))
+        english_window = MainWindow(
+            english_settings,
+            HistoryManager(history_file=data / "english-history.json"),
+            AppLogger(log_file=data / "english-app.log"),
+            ModelRegistryManager(models_dir=data / "english-models"),
+            tray_available=False,
+        )
+        assert [button.text() for button in english_window.nav_buttons] == [
+            "Translate", "History", "Models", "Settings", "Log"
+        ]
+        assert english_window.page_title.text() == "Translate"
+        assert english_window.home.install_models_button.text() == "Get models"
+        assert english_window.settings_page.ui_language.currentData() == "en"
+        assert english_window.settings_page.uninstall_button.text() == "Uninstall"
+        assert english_window.models_page.findChildren(QLabel)[0].text() == "Language models"
+        english_window.show()
+        app.processEvents()
+        for index in range(english_window.pages.count()):
+            scroll_or_page = english_window.pages.widget(index)
+            page = scroll_or_page.widget() if hasattr(scroll_or_page, "widget") else scroll_or_page
+            rendered = QImage(page.size(), QImage.Format.Format_ARGB32)
+            rendered.fill(QColor("#1e1e1e"))
+            page.render(rendered)
+            assert not rendered.isNull()
+        english_window.settings_page.ui_language.setCurrentIndex(0)
+        english_window.settings_page._save()
+        assert english_settings.config.ui_language == "vi"
+        assert english_window.settings_page.feedback.text() == "Khởi động lại ứng dụng để áp dụng ngôn ngữ mới."
+        english_tooltip = FloatingTooltip()
+        english_tooltip.show_result(result, 30, 30)
+        english_tooltip.copy_button.click()
+        assert english_tooltip.copy_button.text() == "Copied"
+        english_tooltip.hide()
+        english_window.close()
         app.processEvents()
 
     print("Qt desktop and overlay smoke check passed.")

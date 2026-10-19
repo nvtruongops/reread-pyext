@@ -7,8 +7,8 @@
 ## Cài đặt
 
 1. Tải `reread_pyext_setup.exe` từ [GitHub Releases](https://github.com/nvtruongops/reread-pyext/releases).
-2. Chạy bộ cài. Ứng dụng được cài theo tài khoản Windows hiện tại và có mục gỡ trong **Installed apps / Apps & features**.
-3. Ở lần mở đầu tiên, chọn thư mục lưu mô hình. Bước này chỉ tạo thư mục và lưu thiết lập; bộ cài không kèm hoặc tự tải mô hình.
+2. Chọn tiếng Việt hoặc tiếng Anh trong bộ cài. Ứng dụng được cài theo tài khoản Windows hiện tại và có mục gỡ trong **Installed apps / Apps & features**.
+3. Ở lần mở đầu tiên, chọn ngôn ngữ giao diện và thư mục lưu mô hình. Có thể đổi ngôn ngữ sau trong **Cài đặt**; cần mở lại ứng dụng để áp dụng.
 4. Mở trang **Mô hình**, chọn hướng dịch và bấm **Tải mô hình**. Cần kết nối mạng trong lúc tải; sau đó ứng dụng dịch ngoại tuyến.
 
 Ứng dụng hỗ trợ thao tác bôi đen và nhấn `Ctrl+C` hai lần, dịch văn bản nhập trực tiếp, lịch sử cục bộ, phím tắt và khay hệ thống. Hướng dẫn thao tác cũng có ngay trong trang **Dịch**.
@@ -66,6 +66,6 @@ Mã nguồn của dự án phát hành theo MIT; xem [LICENSE](LICENSE). Thành 
 
 ## English
 
-re/read Desktop is an offline Windows text translator. Install it with `reread_pyext_setup.exe`, choose a model folder on first launch, then download only the language models you need from the **Models** page. No model weights ship with the installer. Translation runs locally after a model is downloaded. Uninstall removes the app's settings, history, logs, and downloaded models; unrelated files in a custom model folder are preserved.
+re/read Desktop is an offline Windows text translator. The installer and app interface support Vietnamese and English. Choose a language during installation or first-run setup; change it later in **Settings** and restart the app to apply. Choose a model folder on first launch, then download only the models you need from **Models**. No model weights ship with the installer. Translation runs locally after a model is downloaded. Uninstall removes the app's settings, history, logs, and downloaded models; unrelated files in a custom model folder are preserved.
 
 The source is licensed under MIT. Bundled third-party components keep their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

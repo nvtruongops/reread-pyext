@@ -26,15 +26,25 @@ OutputBaseFilename=reread_pyext_setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+ShowLanguageDialog=yes
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion=0.1.0.0
+VersionInfoVersion=0.1.1.0
 VersionInfoDescription=re/read Desktop Installer
 VersionInfoProductName=re/read Desktop
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "en"; MessagesFile: "compiler:Default.isl"
+Name: "vi"; MessagesFile: "languages\Vietnamese.isl"
+
+[CustomMessages]
+en.CreateDesktopShortcut=Create a desktop shortcut
+vi.CreateDesktopShortcut=Tạo lối tắt trên màn hình nền
+en.LaunchApp=Launch re/read Desktop
+vi.LaunchApp=Mở re/read Desktop
+en.UninstallDataPrompt=Uninstalling re/read Desktop will remove its settings, history, logs, and downloaded models.%n%nDo you want to continue?
+vi.UninstallDataPrompt=Gỡ re/read Desktop sẽ xóa cài đặt, lịch sử, nhật ký và các mô hình đã tải.%n%nBạn có muốn tiếp tục không?
 
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -44,10 +54,10 @@ Name: "{group}\re/read Desktop"; Filename: "{app}\reread_pyext.exe"
 Name: "{autodesktop}\re/read Desktop"; Filename: "{app}\reread_pyext.exe"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Tạo lối tắt trên màn hình nền"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopShortcut}"; Flags: unchecked
 
 [Run]
-Filename: "{app}\reread_pyext.exe"; Description: "Mở re/read Desktop"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\reread_pyext.exe"; Parameters: "--ui-language={language}"; Description: "{cm:LaunchApp}"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
 Filename: "{app}\reread_pyext.exe"; Parameters: "--uninstall-cleanup"; RunOnceId: "RereadRemoveUserData"; Flags: waituntilterminated skipifdoesntexist
@@ -58,7 +68,6 @@ begin
   Result := True;
   if not UninstallSilent then
     Result := MsgBox(
-      'Gỡ re/read Desktop sẽ xóa cài đặt, thiết lập, lịch sử, nhật ký và các mô hình đã tải.' + #13#10 + #13#10 +
-      'Bạn có muốn tiếp tục không?',
+      ExpandConstant('{cm:UninstallDataPrompt}'),
       mbConfirmation, MB_YESNO) = IDYES;
 end;

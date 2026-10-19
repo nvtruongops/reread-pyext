@@ -14,7 +14,7 @@ class ModelDirectorySettingsTests(unittest.TestCase):
             settings = SettingsManager(config_path=config_path)
 
             complete_setup = getattr(settings, "complete_first_run_setup", None)
-            completed = complete_setup(model_directory) if complete_setup else False
+            completed = complete_setup(model_directory, "en") if complete_setup else False
 
             self.assertTrue(completed)
             self.assertTrue(model_directory.is_dir())
@@ -22,6 +22,7 @@ class ModelDirectorySettingsTests(unittest.TestCase):
             reloaded = SettingsManager(config_path=config_path)
             self.assertEqual(reloaded.config.model_directory, str(model_directory))
             self.assertTrue(reloaded.config.setup_complete)
+            self.assertEqual(reloaded.config.ui_language, "en")
 
     def test_first_run_setup_flag_defaults_false_and_persists(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -44,6 +45,16 @@ class ModelDirectorySettingsTests(unittest.TestCase):
 
             reloaded = SettingsManager(config_path=config_path)
             self.assertEqual(reloaded.config.model_directory, str(model_directory))
+
+    def test_missing_or_invalid_ui_language_defaults_to_vietnamese(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text('{"target_lang": "en", "ui_language": "fr"}', encoding="utf-8")
+
+            settings = SettingsManager(config_path=config_path)
+
+            self.assertEqual(settings.config.target_lang, "en")
+            self.assertEqual(settings.config.ui_language, "vi")
 
 
 if __name__ == "__main__":

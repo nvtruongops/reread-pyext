@@ -25,6 +25,7 @@ class AppConfig:
     pivot_cjk: bool = True  # Translate Chinese/Japanese to Vietnamese via English pivot
     start_on_boot: bool = False  # Start re/read background service automatically when Windows boots
     target_lang: str = "vi"  # Primary translation target language (e.g. "vi", "en", "ru", "zh", "ja")
+    ui_language: str = "vi"  # Interface language; independent of the translation target
     model_directory: str = ""  # Empty means the default per-user models folder
     setup_complete: bool = False  # First-run model folder setup has been completed
 
@@ -61,6 +62,7 @@ class SettingsManager:
                         pivot_cjk=data.get("pivot_cjk", True),
                         start_on_boot=data.get("start_on_boot", False),
                         target_lang=data.get("target_lang", "vi"),
+                        ui_language=data.get("ui_language") if data.get("ui_language") in ("vi", "en") else "vi",
                         model_directory=str(data.get("model_directory") or ""),
                         setup_complete=bool(data.get("setup_complete", False)),
                     )
@@ -89,20 +91,25 @@ class SettingsManager:
                 setattr(self._config, k, v)
         self.save()
 
-    def complete_first_run_setup(self, model_directory: Path | str) -> bool:
+    def complete_first_run_setup(self, model_directory: Path | str, ui_language: str = "vi") -> bool:
         selected = str(model_directory).strip()
         if not selected:
             raise ValueError("A model directory must be selected.")
+        if ui_language not in ("vi", "en"):
+            raise ValueError("The interface language must be 'vi' or 'en'.")
 
         directory = Path(selected).expanduser()
         directory.mkdir(parents=True, exist_ok=True)
         previous_directory = self._config.model_directory
         previous_setup_complete = self._config.setup_complete
+        previous_ui_language = self._config.ui_language
         self._config.model_directory = str(directory.resolve())
         self._config.setup_complete = True
+        self._config.ui_language = ui_language
         if not self.save():
             self._config.model_directory = previous_directory
             self._config.setup_complete = previous_setup_complete
+            self._config.ui_language = previous_ui_language
             return False
         return True
 

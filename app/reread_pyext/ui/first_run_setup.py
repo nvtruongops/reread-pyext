@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QDialog,
+    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -14,26 +15,34 @@ from PySide6.QtWidgets import (
 
 from ..config.settings import SettingsManager
 from ..paths import models_dir
+from .translations import localize_widgets, set_ui_language, translate
 
 
 class FirstRunSetupDialog(QDialog):
-    def __init__(self, settings: SettingsManager) -> None:
+    def __init__(self, settings: SettingsManager, preferred_language: str | None = None) -> None:
         super().__init__()
         self.settings = settings
-        self.setWindowTitle("Thiết lập re/read")
+        self.language = set_ui_language(preferred_language or settings.config.ui_language)
         self.setMinimumWidth(520)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 22, 24, 22)
         layout.setSpacing(12)
 
-        title = QLabel("Chọn nơi lưu mô hình")
-        title.setStyleSheet("font-size: 16pt; font-weight: 700;")
-        description = QLabel(
+        self.title = QLabel("Chọn nơi lưu mô hình")
+        self.title.setStyleSheet("font-size: 16pt; font-weight: 700;")
+        self.description = QLabel(
             "Chọn thư mục để lưu các mô hình dịch. Ứng dụng chưa tải mô hình nào; "
             "bạn có thể tải từng mô hình sau trong mục Mô hình."
         )
-        description.setWordWrap(True)
+        self.description.setWordWrap(True)
+        self.language_combo = QComboBox()
+        self.language_combo.setObjectName("uiLanguage")
+        self.language_combo.addItem("Tiếng Việt", "vi")
+        self.language_combo.addItem("English", "en")
+        self.language_combo.setCurrentIndex(0 if self.language == "vi" else 1)
+        self.language_combo.currentIndexChanged.connect(self._language_changed)
+        self.directory_label = QLabel("Ngôn ngữ giao diện")
         self.directory_edit = QLineEdit(str(models_dir(settings.config.model_directory)))
         self.directory_edit.setAccessibleName("Thư mục lưu mô hình")
         self.error_label = QLabel("")
@@ -43,30 +52,51 @@ class FirstRunSetupDialog(QDialog):
 
         directory_row = QHBoxLayout()
         directory_row.addWidget(self.directory_edit, 1)
-        browse_button = QPushButton("Duyệt…")
-        browse_button.clicked.connect(self._browse)
-        directory_row.addWidget(browse_button)
+        self.browse_button = QPushButton("Duyệt…")
+        self.browse_button.clicked.connect(self._browse)
+        directory_row.addWidget(self.browse_button)
+        self.folder_label = QLabel("Thư mục lưu mô hình")
 
         button_row = QHBoxLayout()
         button_row.addStretch(1)
-        cancel_button = QPushButton("Hủy")
-        cancel_button.clicked.connect(self.reject)
-        continue_button = QPushButton("Hoàn tất thiết lập")
-        continue_button.setObjectName("primaryButton")
-        continue_button.clicked.connect(self._save_and_accept)
-        button_row.addWidget(cancel_button)
-        button_row.addWidget(continue_button)
+        self.cancel_button = QPushButton("Hủy")
+        self.cancel_button.clicked.connect(self.reject)
+        self.continue_button = QPushButton("Hoàn tất thiết lập")
+        self.continue_button.setObjectName("primaryButton")
+        self.continue_button.setProperty("setupAction", "finish")
+        self.continue_button.clicked.connect(self._save_and_accept)
+        button_row.addWidget(self.cancel_button)
+        button_row.addWidget(self.continue_button)
 
-        layout.addWidget(title)
-        layout.addWidget(description)
+        layout.addWidget(self.title)
+        layout.addWidget(self.directory_label)
+        layout.addWidget(self.language_combo)
+        layout.addWidget(self.description)
+        layout.addWidget(self.folder_label)
         layout.addLayout(directory_row)
         layout.addWidget(self.error_label)
         layout.addLayout(button_row)
+        self._retranslate()
+
+    def _language_changed(self, _index: int) -> None:
+        self.language = set_ui_language(str(self.language_combo.currentData()))
+        self._retranslate()
+
+    def _retranslate(self) -> None:
+        self.setWindowTitle(translate("Thiết lập re/read", self.language))
+        for widget in (self, *self.findChildren(QLabel), *self.findChildren(QPushButton)):
+            if widget is self:
+                continue
+            if isinstance(widget, QLabel):
+                widget.setText(translate(widget.text(), self.language))
+            elif isinstance(widget, QPushButton):
+                widget.setText(translate(widget.text(), self.language))
+        localize_widgets(self, self.language)
 
     def _browse(self) -> None:
         directory = QFileDialog.getExistingDirectory(
             self,
-            "Chọn thư mục lưu mô hình",
+            translate("Chọn thư mục lưu mô hình", self.language),
             self.directory_edit.text(),
         )
         if directory:
@@ -74,10 +104,12 @@ class FirstRunSetupDialog(QDialog):
 
     def _save_and_accept(self) -> None:
         try:
-            if not self.settings.complete_first_run_setup(self.directory_edit.text()):
-                raise OSError("Không thể lưu thiết lập vào thư mục dữ liệu của ứng dụng.")
+            if not self.settings.complete_first_run_setup(
+                self.directory_edit.text(), str(self.language_combo.currentData())
+            ):
+                raise OSError(translate("Không thể lưu thiết lập vào thư mục dữ liệu của ứng dụng.", self.language))
         except Exception as exc:
-            self.error_label.setText(f"Không thể thiết lập thư mục này: {exc}")
+            self.error_label.setText(translate("Không thể thiết lập thư mục này: ", self.language) + str(exc))
             self.error_label.show()
             return
         self.accept()

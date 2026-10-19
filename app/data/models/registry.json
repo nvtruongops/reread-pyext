@@ -1764,21 +1764,21 @@
       "files": [
         {
           "role": "model",
-          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/en-vi/exported/model.envi.intgemm.alphas.bin.gz",
+          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/en-vi/test_prompsit_Ep8JhBQ3QRizDT91JVy8KQ/exported/model.envi.intgemm.alphas.bin.gz",
           "downloadBytes": 24244705,
           "bytes": 31561787,
           "sha256": "04fa6044593a404c2aa02b3096f203880852df6f8f41e5eb966ed9f2b4366737"
         },
         {
           "role": "shortlist",
-          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/en-vi/exported/lex.50.50.envi.s2t.bin.gz",
+          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/en-vi/test_prompsit_Ep8JhBQ3QRizDT91JVy8KQ/exported/lex.50.50.envi.s2t.bin.gz",
           "downloadBytes": 2246027,
           "bytes": 4597684,
           "sha256": "18116817fcd3d24dcdfd97cb57e9e60472800dae3b8a007f6f36d61d645f699c"
         },
         {
           "role": "vocab",
-          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/en-vi/exported/vocab.envi.spm.gz",
+          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/en-vi/test_prompsit_Ep8JhBQ3QRizDT91JVy8KQ/exported/vocab.envi.spm.gz",
           "downloadBytes": 400183,
           "bytes": 785200,
           "sha256": "76daa9a49e393e50c865c889290e4dc36e9453e5e1ec9df7b9f3bc39ea782537"
@@ -3043,27 +3043,27 @@
       "pair": "vien",
       "from": "vi",
       "to": "en",
-      "architecture": "base-memory",
+      "architecture": "tiny",
       "downloadBytes": 15177910,
       "bytes": 21808485,
       "files": [
         {
           "role": "model",
-          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/vi-en/exported/model.vien.intgemm.alphas.bin.gz",
+          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/vi-en/spring-2024_Nc0SHbrgQaiFt4_FmKBXOA/exported/model.vien.intgemm.alphas.bin.gz",
           "downloadBytes": 12914609,
           "bytes": 17141051,
           "sha256": "de4bf2b9ffb4d910e32720ec3a43655fb6f4062ce5219332f824fc1bdca7a5f4"
         },
         {
           "role": "shortlist",
-          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/vi-en/exported/lex.50.50.vien.s2t.bin.gz",
+          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/vi-en/spring-2024_Nc0SHbrgQaiFt4_FmKBXOA/exported/lex.50.50.vien.s2t.bin.gz",
           "downloadBytes": 1887658,
           "bytes": 3910184,
           "sha256": "3a071ed3d982f6eb6ee116b84067bf70041e4229e43ea65ecb6d7c2796e8851b"
         },
         {
           "role": "vocab",
-          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/vi-en/exported/vocab.vien.spm.gz",
+          "url": "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/models/vi-en/spring-2024_Nc0SHbrgQaiFt4_FmKBXOA/exported/vocab.vien.spm.gz",
           "downloadBytes": 375643,
           "bytes": 757250,
           "sha256": "cb152765d1e71ea3cf96fdb339c764b7201be7b9ab32e20cfebcf16a20fc0939"

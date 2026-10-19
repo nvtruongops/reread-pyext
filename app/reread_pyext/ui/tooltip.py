@@ -9,6 +9,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..kernel.kernel import TranslationResult
+from .translations import localize_widgets, translate
 
 
 class FloatingTooltip(QWidget):
@@ -71,6 +72,7 @@ class FloatingTooltip(QWidget):
         card.mousePressEvent = self._drag_start
         card.mouseMoveEvent = self._drag_move
         card.mouseReleaseEvent = self._drag_end
+        localize_widgets(self)
 
     def set_auto_close_seconds(self, seconds: int) -> None:
         self.auto_close_seconds = max(0, seconds)
@@ -84,7 +86,7 @@ class FloatingTooltip(QWidget):
         self._is_hold = is_hold
         self.route.setText(f"{result.src_lang.upper()}  →  {result.tgt_lang.upper()}")
         self.duration.setText(f"{result.duration_ms:.0f} ms")
-        self.translation.setText(result.translated_text or result.error or "Không có bản dịch.")
+        self.translation.setText(result.translated_text or translate(result.error) or translate("Không có bản dịch."))
         text = result.source_text
         snippet = text if len(text) <= 140 else text[:137] + "…"
         self.source.setText(snippet)
@@ -125,8 +127,8 @@ class FloatingTooltip(QWidget):
     def _copy(self) -> None:
         if self._current_result and self._current_result.translated_text:
             QApplication.clipboard().setText(self._current_result.translated_text)
-            self.copy_button.setText("Đã sao chép")
-            QTimer.singleShot(1300, lambda: self.copy_button.setText("Sao chép"))
+            self.copy_button.setText(translate("Đã sao chép"))
+            QTimer.singleShot(1300, lambda: self.copy_button.setText(translate("Sao chép")))
 
     def _drag_start(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
