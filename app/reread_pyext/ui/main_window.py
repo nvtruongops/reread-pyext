@@ -863,9 +863,10 @@ class SettingsPage(QWidget):
         body_layout.addWidget(title)
 
         language_card, language_layout = _card("Ngôn ngữ giao diện")
-        self.ui_language = QComboBox()
+        self.ui_language = AppComboBox()
         self.ui_language.addItem("Tiếng Việt", "vi")
         self.ui_language.addItem("English", "en")
+        _style_combo_popup(self.ui_language)
         self._form_row(language_layout, "Ngôn ngữ giao diện", self.ui_language)
         body_layout.addWidget(language_card)
 

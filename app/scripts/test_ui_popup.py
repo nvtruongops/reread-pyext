@@ -50,6 +50,24 @@ from reread_pyext.ui.tooltip import FloatingTooltip
 from reread_pyext.ui.first_run_setup import FirstRunSetupDialog
 
 
+def _assert_no_black_popup_rows(combo) -> None:
+    combo.showPopup()
+    QApplication.processEvents()
+    image = combo.view().window().grab().toImage()
+    assert not image.isNull()
+    assert all(
+        sum(
+            1
+            for x in range(image.width())
+            if (color := image.pixelColor(x, y)).red() < 40
+            and color.green() < 40
+            and color.blue() < 40
+        ) < image.width() * 0.9
+        for y in range(image.height())
+    ), "The language popup contains a solid black row."
+    combo.hidePopup()
+
+
 def main() -> int:
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
@@ -62,58 +80,82 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="reread-qt-smoke-") as temp_dir:
         data = Path(temp_dir)
         setup_settings = SettingsManager(config_path=data / "first-run-config.json")
-        selected_models = data / "selected-models"
-        setup_dialog = FirstRunSetupDialog(setup_settings)
-        assert [setup_dialog.language_combo.itemData(i) for i in range(setup_dialog.language_combo.count())] == ["vi", "en"]
-        setup_dialog.show()
-        app.processEvents()
-        setup_dialog.language_combo.showPopup()
-        app.processEvents()
-        popup_image = setup_dialog.language_combo.view().window().grab().toImage()
-        assert not popup_image.isNull()
-        assert all(
-            sum(
-                1
-                for x in range(popup_image.width())
-                if (color := popup_image.pixelColor(x, y)).red() < 40
-                and color.green() < 40
-                and color.blue() < 40
-            ) < popup_image.width() * 0.9
-            for y in range(popup_image.height())
-        ), "The setup language popup contains a solid black row."
-        setup_dialog.language_combo.hidePopup()
-        setup_dialog.hide()
-        setup_dialog.directory_edit.setText(str(selected_models))
-        setup_dialog.language_combo.setCurrentIndex(1)
+        default_models = data / "appdata" / "models" / "reread_pyext"
 
-        preferred_settings = SettingsManager(config_path=data / "preferred-config.json")
-        preferred_setup_dialog = FirstRunSetupDialog(preferred_settings, preferred_language="en")
-        preferred_setup_dialog.show()
-        app.processEvents()
-        assert preferred_setup_dialog.language == "en"
-        assert preferred_setup_dialog.language_combo.currentData() == "en"
-        assert preferred_setup_dialog.language_combo.isHidden()
-        assert preferred_setup_dialog.language_label.isHidden()
-        preferred_setup_dialog.directory_edit.setText(str(data / "installer-selected-models"))
-        preferred_setup_dialog.continue_button.click()
-        assert preferred_settings.config.setup_complete
-        assert preferred_settings.config.ui_language == "en"
+        class RecordingStartup:
+            def __init__(self, registered=False):
+                self.registered = registered
+                self.registered_command = "existing-command" if registered else None
+                self.register_calls = []
+                self.clear_calls = 0
 
-        def complete_first_run_setup() -> None:
-            image = setup_dialog.grab().toImage()
-            assert image.pixelColor(5, 5).name() == "#f3f6f4"
-            button = next(
-                button for button in setup_dialog.findChildren(QPushButton)
-                if button.property("setupAction") == "finish"
-            )
-            button.click()
+            def is_registered(self):
+                return self.registered, "RereadDesktopService" if self.registered else None, self.registered_command
 
-        QTimer.singleShot(0, complete_first_run_setup)
-        assert setup_dialog.exec() == QDialog.DialogCode.Accepted
+            def register(self, command=None):
+                self.register_calls.append(command)
+                self.registered = True
+                self.registered_command = command or "new-command"
+                return True, "registered"
+
+            def clear_keys(self):
+                self.clear_calls += 1
+                self.registered = False
+                self.registered_command = None
+                return True, "cleared", 1
+
+        setup_startup = RecordingStartup()
+        with patch.dict(os.environ, {"REREAD_DATA_DIR": str(data / "appdata")}):
+            with patch("reread_pyext.ui.first_run_setup.StartupManager", return_value=setup_startup):
+                setup_dialog = FirstRunSetupDialog(setup_settings)
+                assert [setup_dialog.language_combo.itemData(i) for i in range(setup_dialog.language_combo.count())] == ["vi", "en"]
+                assert not hasattr(setup_dialog, "directory_edit")
+                assert not hasattr(setup_dialog, "browse_button")
+                assert setup_dialog.start_on_boot.isHidden() is (sys.platform != "win32")
+                setup_dialog.show()
+                app.processEvents()
+                _assert_no_black_popup_rows(setup_dialog.language_combo)
+                setup_dialog.hide()
+                setup_dialog.language_combo.setCurrentIndex(1)
+                assert setup_dialog.title.text() == "First-time setup"
+                assert setup_dialog.start_on_boot.text() == "Start re/read in the background when you sign in to Windows"
+                setup_dialog.language_combo.setCurrentIndex(0)
+                assert setup_dialog.title.text() == "Thiết lập lần đầu"
+                setup_dialog.language_combo.setCurrentIndex(1)
+                setup_dialog.start_on_boot.setChecked(True)
+
+                preferred_settings = SettingsManager(config_path=data / "preferred-config.json")
+                preferred_setup_dialog = FirstRunSetupDialog(preferred_settings, preferred_language="en")
+                preferred_setup_dialog.show()
+                app.processEvents()
+                assert preferred_setup_dialog.language == "en"
+                assert preferred_setup_dialog.language_combo.currentData() == "en"
+                assert preferred_setup_dialog.language_combo.isHidden()
+                assert preferred_setup_dialog.language_label.isHidden()
+                preferred_setup_dialog.continue_button.click()
+                assert preferred_settings.config.setup_complete
+                assert preferred_settings.config.ui_language == "en"
+
+                def complete_first_run_setup() -> None:
+                    image = setup_dialog.grab().toImage()
+                    assert image.pixelColor(5, 5).name() == "#f3f6f4"
+                    button = next(
+                        button for button in setup_dialog.findChildren(QPushButton)
+                        if button.property("setupAction") == "finish"
+                    )
+                    button.click()
+
+                QTimer.singleShot(0, complete_first_run_setup)
+                assert setup_dialog.exec() == QDialog.DialogCode.Accepted
+
         assert setup_settings.config.setup_complete
-        assert setup_settings.config.model_directory == str(selected_models)
+        assert setup_settings.config.model_directory == str(default_models.resolve())
         assert setup_settings.config.ui_language == "en"
-        assert selected_models.is_dir() and list(selected_models.iterdir()) == []
+        assert setup_settings.config.start_on_boot is (sys.platform == "win32")
+        assert default_models.is_dir() and list(default_models.iterdir()) == []
+        if sys.platform == "win32":
+            assert setup_startup.register_calls == [None]
+            assert setup_startup.registered
 
         settings = SettingsManager(config_path=data / "config.json")
         settings.update(model_directory=str(data / "models"))
@@ -125,6 +167,10 @@ def main() -> int:
         window.set_status("Đang hoạt động · dịch ngoại tuyến", ready=True)
         window.show()
         app.processEvents()
+        window.show_page(PAGE_SETTINGS)
+        app.processEvents()
+        _assert_no_black_popup_rows(window.settings_page.ui_language)
+        window.show_page(PAGE_OVERVIEW)
         for index in range(window.pages.count()):
             scroll_or_page = window.pages.widget(index)
             page = scroll_or_page.widget() if hasattr(scroll_or_page, "widget") else scroll_or_page

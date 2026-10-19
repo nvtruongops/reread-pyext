@@ -92,7 +92,12 @@ class SettingsManager:
                 setattr(self._config, k, v)
         self.save()
 
-    def complete_first_run_setup(self, model_directory: Path | str, ui_language: str = "vi") -> bool:
+    def complete_first_run_setup(
+        self,
+        model_directory: Path | str,
+        ui_language: str = "vi",
+        start_on_boot: bool | None = None,
+    ) -> bool:
         selected = str(model_directory).strip()
         if not selected:
             raise ValueError("A model directory must be selected.")
@@ -104,13 +109,17 @@ class SettingsManager:
         previous_directory = self._config.model_directory
         previous_setup_complete = self._config.setup_complete
         previous_ui_language = self._config.ui_language
+        previous_start_on_boot = self._config.start_on_boot
         self._config.model_directory = str(directory.resolve())
         self._config.setup_complete = True
         self._config.ui_language = ui_language
+        if start_on_boot is not None:
+            self._config.start_on_boot = start_on_boot
         if not self.save():
             self._config.model_directory = previous_directory
             self._config.setup_complete = previous_setup_complete
             self._config.ui_language = previous_ui_language
+            self._config.start_on_boot = previous_start_on_boot
             return False
         return True
 

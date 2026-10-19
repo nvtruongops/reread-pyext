@@ -24,6 +24,26 @@ class ModelDirectorySettingsTests(unittest.TestCase):
             self.assertTrue(reloaded.config.setup_complete)
             self.assertEqual(reloaded.config.ui_language, "en")
 
+    def test_first_run_setup_persists_startup_preference(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            settings = SettingsManager(config_path=root / "config.json")
+
+            completed = settings.complete_first_run_setup(root / "models", "en", True)
+
+            self.assertTrue(completed)
+            self.assertTrue(SettingsManager(config_path=root / "config.json").config.start_on_boot)
+
+    def test_first_run_setup_keeps_startup_preference_when_not_provided(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            settings = SettingsManager(config_path=root / "config.json")
+            settings.update(start_on_boot=True)
+
+            settings.complete_first_run_setup(root / "models", "vi")
+
+            self.assertTrue(settings.config.start_on_boot)
+
     def test_first_run_setup_flag_defaults_false_and_persists(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
