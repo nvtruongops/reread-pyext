@@ -205,7 +205,46 @@ def main() -> int:
         assert window.home.settings_button.text() == "Chọn nơi lưu"
         assert window.home.layout().itemAt(1).widget() is window.home.quick_start_card
         assert [window.settings_page.ui_language.itemData(i) for i in range(window.settings_page.ui_language.count())] == ["vi", "en"]
+        assert window.settings_page.restart_button.isEnabled()
         assert window.settings_page.uninstall_button.text() == "Gỡ cài đặt"
+        restart_requests = []
+        window.restart_requested.connect(lambda: restart_requests.append(True))
+        window.settings_page.restart_button.click()
+        assert restart_requests == [True]
+        original_auto_drag = window.settings_page.auto_drag.isChecked()
+        window.settings_page.auto_drag.setChecked(not original_auto_drag)
+        assert not window.settings_page.restart_button.isEnabled()
+        window.settings_page.auto_drag.setChecked(original_auto_drag)
+        assert window.settings_page.restart_button.isEnabled()
+
+        searchable_package = SimpleNamespace(
+            pair="vien",
+            from_lang="vi",
+            to_lang="en",
+            from_name="Vietnamese",
+            to_name="English",
+            from_display_name="Tiếng Việt",
+            to_display_name="Tiếng Anh",
+            display_name="Tiếng Việt → Tiếng Anh",
+            is_installed=False,
+            underlying_pair=None,
+            installed_size_mb=0.0,
+            download_size_mb=15.0,
+        )
+        original_model_manager = window.models_page.manager
+        window.models_page.manager = SimpleNamespace(get_available_packages=lambda: [searchable_package])
+        for query in (
+            "tiếng việt - tiếng anh",
+            "tiếng việt -> tiếng anh",
+            "tiếng việt → tiếng anh",
+            "tieng viet -> tieng anh",
+        ):
+            window.models_page.search.setText(query)
+            assert window.models_page.list.count() == 1, f"Model search failed for: {query}"
+            assert window.models_page.list.item(0).data(Qt.ItemDataRole.UserRole) == "vien"
+        window.models_page.manager = original_model_manager
+        window.models_page.search.clear()
+
         uninstall_requests = []
         window.uninstall_requested.connect(lambda: uninstall_requests.append(True))
         with patch("reread_pyext.ui.main_window._confirm_action", return_value=True):
@@ -581,6 +620,7 @@ def main() -> int:
         assert english_window.page_title.text() == "Translate"
         assert english_window.home.install_models_button.text() == "Get models"
         assert english_window.settings_page.ui_language.currentData() == "en"
+        assert english_window.settings_page.restart_button.text() == "Restart"
         assert english_window.settings_page.uninstall_button.text() == "Uninstall"
         assert english_window.models_page.findChildren(QLabel)[0].text() == "Language models"
         english_window.show()

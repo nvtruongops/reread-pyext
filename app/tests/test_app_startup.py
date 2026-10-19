@@ -1,4 +1,6 @@
 import unittest
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -9,6 +11,27 @@ from reread_pyext.hook import selection_hook
 
 
 class AppStartupTests(unittest.TestCase):
+    def test_restart_relaunches_source_app_with_background_and_qt_arguments(self):
+        app = SimpleNamespace(
+            _setup_cancelled=False,
+            _restart_requested=True,
+            _background=True,
+            _qt_args=("-platform", "offscreen"),
+            application=SimpleNamespace(exec=Mock(return_value=0)),
+            logger=Mock(),
+        )
+
+        with patch.object(desktop_app.subprocess, "Popen") as popen:
+            self.assertEqual(desktop_app.RereadDesktopApp.run(app), 0)
+
+        popen.assert_called_once_with([
+            sys.executable,
+            str(Path(sys.argv[0]).resolve()),
+            "-platform",
+            "offscreen",
+            "--background",
+        ])
+
     def test_cancelling_first_run_setup_exits_before_logging_or_kernel_startup(self):
         fake_application = Mock()
         settings = SimpleNamespace(config=SimpleNamespace(setup_complete=False))

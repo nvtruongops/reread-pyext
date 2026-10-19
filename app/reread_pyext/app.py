@@ -40,6 +40,8 @@ class AppSignals(QObject):
 
 class RereadDesktopApp(QObject):
     def __init__(self, background: bool = False, initial_language: str | None = None) -> None:
+        self._background = background
+        self._qt_args = tuple(sys.argv[1:])
         self.application = QApplication.instance() or QApplication(sys.argv[:1])
         self.application.setApplicationName("re/read Desktop")
         self.application.setOrganizationName("re/read")
@@ -74,6 +76,7 @@ class RereadDesktopApp(QObject):
         self._is_running = True
         self._paused = False
         self._shutdown_started = False
+        self._restart_requested = False
         self.signals = AppSignals(self)
 
         icon_path = resource_path("assets", "icon.ico")
@@ -120,6 +123,7 @@ class RereadDesktopApp(QObject):
         self.signals.translated.connect(self._show_translation, Qt.ConnectionType.QueuedConnection)
         self.main_window.pause_requested.connect(self.toggle_pause)
         self.main_window.quit_requested.connect(self.shutdown)
+        self.main_window.restart_requested.connect(self.restart)
         self.main_window.uninstall_requested.connect(self.start_uninstaller)
         self.main_window.manual_translation_requested.connect(self._handle_manual_translation)
         self.settings_mgr.add_listener(self._on_settings_updated)
@@ -287,6 +291,11 @@ class RereadDesktopApp(QObject):
         self.tooltip.hide()
         self.application.quit()
 
+    @Slot()
+    def restart(self) -> None:
+        self._restart_requested = True
+        self.shutdown()
+
     def start_uninstaller(self) -> None:
         uninstaller = Path(sys.executable).resolve().with_name("unins000.exe")
         if not uninstaller.is_file():
@@ -310,7 +319,25 @@ class RereadDesktopApp(QObject):
     def run(self) -> int:
         if self._setup_cancelled:
             return 0
-        return self.application.exec()
+        exit_code = self.application.exec()
+        if self._restart_requested:
+            command = [sys.executable]
+            if not (getattr(sys, "frozen", False) or "__compiled__" in globals()):
+                command.append(str(Path(sys.argv[0]).resolve()))
+            command.extend(self._qt_args)
+            if self._background:
+                command.append("--background")
+            try:
+                subprocess.Popen(command)
+            except OSError as exc:
+                self.logger.error(f"Application restart failed: {exc}")
+                QMessageBox.warning(
+                    None,
+                    translate("Không thể khởi động lại"),
+                    translate("Không thể mở lại ứng dụng: ") + str(exc),
+                )
+                return 1
+        return exit_code
 
 
 def main() -> int:

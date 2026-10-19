@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from pathlib import Path
 from typing import Optional
 
@@ -644,6 +646,12 @@ class HistoryPage(QWidget):
             self.refresh()
 
 
+def _normalize_model_search_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value).casefold().replace("đ", "d")
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    return " ".join(re.sub(r"[\W_]+", " ", normalized).split())
+
+
 class ModelPage(QWidget):
     def __init__(self, manager: ModelRegistryManager) -> None:
         super().__init__()
@@ -705,17 +713,23 @@ class ModelPage(QWidget):
     def refresh(self, *_args) -> None:
         current_pair = self._selected_pair()
         self.packages = self.manager.get_available_packages()
-        query = self.search.text().strip().casefold()
+        query = _normalize_model_search_text(self.search.text())
+        query_terms = query.split()
         visible = [
             package for package in self.packages
-            if not query or query in " ".join((
-                package.pair,
-                package.from_name,
-                package.to_name,
-                package.from_display_name,
-                package.to_display_name,
-                package.display_name,
-            )).casefold()
+            if not query_terms or all(
+                term in _normalize_model_search_text(" ".join((
+                    package.pair,
+                    package.from_name,
+                    package.to_name,
+                    package.from_display_name,
+                    package.to_display_name,
+                    package.display_name,
+                    f"{package.from_display_name} → {package.to_display_name}",
+                    f"{package.from_lang} → {package.to_lang}",
+                )))
+                for term in query_terms
+            )
         ]
         visible.sort(key=lambda package: not package.is_installed)
         self.list.blockSignals(True)
@@ -839,6 +853,7 @@ class ModelPage(QWidget):
 class SettingsPage(QWidget):
     saved = Signal(object)
     uninstall_requested = Signal()
+    restart_requested = Signal()
 
     def __init__(self, settings: SettingsManager) -> None:
         super().__init__()
@@ -978,6 +993,10 @@ class SettingsPage(QWidget):
         self.dirty_status.setObjectName("dirtyStatus")
         self.feedback = QLabel("")
         self.feedback.setObjectName("muted")
+        self.restart_button = QPushButton("Khởi động lại")
+        self.restart_button.setObjectName("quietButton")
+        self.restart_button.setToolTip(translate("Khởi động lại ứng dụng và dịch vụ để áp dụng cấu hình đã lưu."))
+        self.restart_button.clicked.connect(self.restart_requested.emit)
         self.undo_button = QPushButton("Hoàn tác")
         self.undo_button.setObjectName("quietButton")
         self.undo_button.clicked.connect(self._undo)
@@ -986,6 +1005,7 @@ class SettingsPage(QWidget):
         self.save_button.clicked.connect(self._save)
         footer_layout.addWidget(self.dirty_status, 1)
         footer_layout.addWidget(self.feedback)
+        footer_layout.addWidget(self.restart_button)
         footer_layout.addWidget(self.undo_button)
         footer_layout.addWidget(self.save_button)
         outer.addWidget(footer)
@@ -1077,6 +1097,7 @@ class SettingsPage(QWidget):
         self.dirty_status.style().polish(self.dirty_status)
         self.save_button.setEnabled(dirty)
         self.undo_button.setEnabled(dirty)
+        self.restart_button.setEnabled(not dirty)
         if dirty:
             self.feedback.clear()
 
@@ -1242,6 +1263,7 @@ class ActivityPage(QWidget):
 class MainWindow(QMainWindow):
     pause_requested = Signal()
     quit_requested = Signal()
+    restart_requested = Signal()
     uninstall_requested = Signal()
 
     def __init__(
@@ -1350,6 +1372,7 @@ class MainWindow(QMainWindow):
         self.home.translate_requested.connect(self.manual_translation_requested.emit)
         self.home.models_requested.connect(lambda: self.show_page(PAGE_MODELS))
         self.home.settings_requested.connect(lambda: self.show_page(PAGE_SETTINGS))
+        self.settings_page.restart_requested.connect(self.restart_requested.emit)
         self.settings_page.uninstall_requested.connect(self.uninstall_requested.emit)
         localize_widgets(self)
 
