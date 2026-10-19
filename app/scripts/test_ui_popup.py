@@ -36,6 +36,7 @@ from reread_pyext.config.model_registry import ModelRegistryManager
 from reread_pyext.config.settings import SettingsManager
 from reread_pyext.kernel import TranslationResult
 from reread_pyext.logger import AppLogger
+from reread_pyext.update_checker import UpdateCheckResult
 from reread_pyext.ui.main_window import (
     APP_STYLE,
     PAGE_ACTIVITY,
@@ -207,6 +208,22 @@ def main() -> int:
         assert [window.settings_page.ui_language.itemData(i) for i in range(window.settings_page.ui_language.count())] == ["vi", "en"]
         assert window.settings_page.restart_button.isEnabled()
         assert window.settings_page.uninstall_button.text() == "Gỡ cài đặt"
+        assert window.settings_page.version_label.text() == "Phiên bản: v0.1.5"
+        assert window.settings_page.check_update_button.text() == "Kiểm tra cập nhật"
+        window.settings_page._show_update_result(UpdateCheckResult(
+            "0.2.0", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.2.0", True
+        ))
+        assert not window.settings_page.open_release_button.isHidden()
+        assert "v0.2.0" in window.settings_page.update_status.text()
+        window.settings_page._show_update_result(UpdateCheckResult(
+            "0.1.5", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.1.5", False
+        ))
+        assert window.settings_page.open_release_button.isHidden()
+        assert "mới nhất" in window.settings_page.update_status.text()
+        window.settings_page.check_update_button.setEnabled(False)
+        window.settings_page._show_update_error()
+        assert window.settings_page.check_update_button.isEnabled()
+        assert "kết nối mạng" in window.settings_page.update_status.text()
         restart_requests = []
         window.restart_requested.connect(lambda: restart_requests.append(True))
         window.settings_page.restart_button.click()
@@ -620,6 +637,8 @@ def main() -> int:
         assert english_window.page_title.text() == "Translate"
         assert english_window.home.install_models_button.text() == "Get models"
         assert english_window.settings_page.ui_language.currentData() == "en"
+        assert english_window.settings_page.version_label.text() == "Version: v0.1.5"
+        assert english_window.settings_page.check_update_button.text() == "Check for updates"
         assert english_window.settings_page.restart_button.text() == "Restart"
         assert english_window.settings_page.uninstall_button.text() == "Uninstall"
         assert english_window.models_page.findChildren(QLabel)[0].text() == "Language models"

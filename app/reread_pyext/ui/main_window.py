@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import threading
 import unicodedata
 from pathlib import Path
 from typing import Optional
@@ -48,6 +49,8 @@ from ..config.settings import AppConfig, SettingsManager
 from ..config.startup import StartupManager
 from ..logger import AppLogger
 from ..paths import app_data_dir, models_dir, resource_path
+from .. import __version__
+from ..update_checker import UpdateCheckResult, check_for_update
 from .translations import localize_widgets, set_ui_language, translate, ui_language
 
 
@@ -854,6 +857,8 @@ class SettingsPage(QWidget):
     saved = Signal(object)
     uninstall_requested = Signal()
     restart_requested = Signal()
+    update_check_complete = Signal(object)
+    update_check_failed = Signal()
 
     def __init__(self, settings: SettingsManager) -> None:
         super().__init__()
@@ -969,6 +974,29 @@ class SettingsPage(QWidget):
         storage_layout.addWidget(self.model_directory_hint)
         body_layout.addWidget(storage)
 
+        updates, updates_layout = _card(
+            "Cập nhật ứng dụng",
+            "Kiểm tra bản phát hành ổn định trên GitHub. Ứng dụng không tự tải hoặc cài đặt bản mới.",
+        )
+        self.version_label = QLabel(f"{translate('Phiên bản')}: v{__version__}")
+        self.update_status = QLabel("Chưa kiểm tra cập nhật.")
+        self.update_status.setObjectName("muted")
+        self.update_status.setWordWrap(True)
+        update_actions = QHBoxLayout()
+        self.check_update_button = QPushButton("Kiểm tra cập nhật")
+        self.check_update_button.setObjectName("primaryButton")
+        self.check_update_button.clicked.connect(self._check_for_updates)
+        self.open_release_button = QPushButton("Xem bản phát hành trên GitHub")
+        self.open_release_button.hide()
+        self.open_release_button.clicked.connect(self._open_latest_release)
+        update_actions.addWidget(self.check_update_button)
+        update_actions.addWidget(self.open_release_button)
+        update_actions.addStretch(1)
+        updates_layout.addWidget(self.version_label)
+        updates_layout.addWidget(self.update_status)
+        updates_layout.addLayout(update_actions)
+        body_layout.addWidget(updates)
+
         uninstall, uninstall_layout = _card(
             "Gỡ cài đặt re/read",
             "Gỡ ứng dụng cùng lịch sử, cài đặt và toàn bộ mô hình đã tải.",
@@ -1024,7 +1052,39 @@ class SettingsPage(QWidget):
             signal.connect(self._update_dirty_state)
         self.auto_close_enabled.toggled.connect(self.auto_close_delay.setEnabled)
         self.start_on_boot.toggled.connect(self._refresh_startup_status)
+        self.update_check_complete.connect(self._show_update_result)
+        self.update_check_failed.connect(self._show_update_error)
         self.load()
+
+    def _check_for_updates(self) -> None:
+        self.check_update_button.setEnabled(False)
+        self.update_status.setText(translate("Đang kiểm tra cập nhật…"))
+
+        def check() -> None:
+            try:
+                self.update_check_complete.emit(check_for_update(__version__))
+            except Exception:
+                self.update_check_failed.emit()
+
+        threading.Thread(target=check, name="reread-update-check", daemon=True).start()
+
+    def _show_update_result(self, result: UpdateCheckResult) -> None:
+        self.check_update_button.setEnabled(True)
+        self._latest_release_url = result.release_url if result.update_available else ""
+        self.open_release_button.setVisible(result.update_available)
+        if result.update_available:
+            self.update_status.setText(f"{translate('Có phiên bản mới: ')}v{result.latest_version}")
+        else:
+            self.update_status.setText(f"{translate('Bạn đang dùng phiên bản mới nhất.')} (v{__version__})")
+
+    def _show_update_error(self) -> None:
+        self.check_update_button.setEnabled(True)
+        self.open_release_button.hide()
+        self.update_status.setText(translate("Không thể kiểm tra cập nhật. Hãy kiểm tra kết nối mạng rồi thử lại."))
+
+    def _open_latest_release(self) -> None:
+        if getattr(self, "_latest_release_url", ""):
+            QDesktopServices.openUrl(QUrl(self._latest_release_url))
 
     @staticmethod
     def _form_row(layout: QVBoxLayout, label_text: str, control: QWidget) -> None:
