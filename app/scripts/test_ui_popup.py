@@ -65,8 +65,39 @@ def main() -> int:
         selected_models = data / "selected-models"
         setup_dialog = FirstRunSetupDialog(setup_settings)
         assert [setup_dialog.language_combo.itemData(i) for i in range(setup_dialog.language_combo.count())] == ["vi", "en"]
+        setup_dialog.show()
+        app.processEvents()
+        setup_dialog.language_combo.showPopup()
+        app.processEvents()
+        popup_image = setup_dialog.language_combo.view().window().grab().toImage()
+        assert not popup_image.isNull()
+        assert all(
+            sum(
+                1
+                for x in range(popup_image.width())
+                if (color := popup_image.pixelColor(x, y)).red() < 40
+                and color.green() < 40
+                and color.blue() < 40
+            ) < popup_image.width() * 0.9
+            for y in range(popup_image.height())
+        ), "The setup language popup contains a solid black row."
+        setup_dialog.language_combo.hidePopup()
+        setup_dialog.hide()
         setup_dialog.directory_edit.setText(str(selected_models))
         setup_dialog.language_combo.setCurrentIndex(1)
+
+        preferred_settings = SettingsManager(config_path=data / "preferred-config.json")
+        preferred_setup_dialog = FirstRunSetupDialog(preferred_settings, preferred_language="en")
+        preferred_setup_dialog.show()
+        app.processEvents()
+        assert preferred_setup_dialog.language == "en"
+        assert preferred_setup_dialog.language_combo.currentData() == "en"
+        assert preferred_setup_dialog.language_combo.isHidden()
+        assert preferred_setup_dialog.language_label.isHidden()
+        preferred_setup_dialog.directory_edit.setText(str(data / "installer-selected-models"))
+        preferred_setup_dialog.continue_button.click()
+        assert preferred_settings.config.setup_complete
+        assert preferred_settings.config.ui_language == "en"
 
         def complete_first_run_setup() -> None:
             image = setup_dialog.grab().toImage()

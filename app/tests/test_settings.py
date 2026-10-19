@@ -56,6 +56,36 @@ class ModelDirectorySettingsTests(unittest.TestCase):
             self.assertEqual(settings.config.target_lang, "en")
             self.assertEqual(settings.config.ui_language, "vi")
 
+    def test_legacy_model_directory_marks_setup_complete_when_flag_is_missing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text('{"model_directory": "D:/re-read-models"}', encoding="utf-8")
+
+            settings = SettingsManager(config_path=config_path)
+
+            self.assertTrue(settings.config.setup_complete)
+
+    def test_missing_model_directory_keeps_legacy_setup_incomplete(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text('{"target_lang": "en"}', encoding="utf-8")
+
+            settings = SettingsManager(config_path=config_path)
+
+            self.assertFalse(settings.config.setup_complete)
+
+    def test_explicit_incomplete_setup_flag_is_preserved_for_legacy_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                '{"model_directory": "D:/re-read-models", "setup_complete": false}',
+                encoding="utf-8",
+            )
+
+            settings = SettingsManager(config_path=config_path)
+
+            self.assertFalse(settings.config.setup_complete)
+
 
 if __name__ == "__main__":
     unittest.main()

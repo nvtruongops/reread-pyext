@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QDialog,
-    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -15,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from ..config.settings import SettingsManager
 from ..paths import models_dir
+from .main_window import AppComboBox, _style_combo_popup
 from .translations import localize_widgets, set_ui_language, translate
 
 
@@ -36,13 +36,14 @@ class FirstRunSetupDialog(QDialog):
             "bạn có thể tải từng mô hình sau trong mục Mô hình."
         )
         self.description.setWordWrap(True)
-        self.language_combo = QComboBox()
+        self.language_combo = AppComboBox()
         self.language_combo.setObjectName("uiLanguage")
         self.language_combo.addItem("Tiếng Việt", "vi")
         self.language_combo.addItem("English", "en")
         self.language_combo.setCurrentIndex(0 if self.language == "vi" else 1)
         self.language_combo.currentIndexChanged.connect(self._language_changed)
-        self.directory_label = QLabel("Ngôn ngữ giao diện")
+        _style_combo_popup(self.language_combo)
+        self.language_label = QLabel("Ngôn ngữ giao diện")
         self.directory_edit = QLineEdit(str(models_dir(settings.config.model_directory)))
         self.directory_edit.setAccessibleName("Thư mục lưu mô hình")
         self.error_label = QLabel("")
@@ -69,7 +70,7 @@ class FirstRunSetupDialog(QDialog):
         button_row.addWidget(self.continue_button)
 
         layout.addWidget(self.title)
-        layout.addWidget(self.directory_label)
+        layout.addWidget(self.language_label)
         layout.addWidget(self.language_combo)
         layout.addWidget(self.description)
         layout.addWidget(self.folder_label)
@@ -77,6 +78,9 @@ class FirstRunSetupDialog(QDialog):
         layout.addWidget(self.error_label)
         layout.addLayout(button_row)
         self._retranslate()
+        if preferred_language is not None:
+            self.language_label.hide()
+            self.language_combo.hide()
 
     def _language_changed(self, _index: int) -> None:
         self.language = set_ui_language(str(self.language_combo.currentData()))

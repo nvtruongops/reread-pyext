@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reread-pyext"
-version = "0.1.1"
+version = "0.1.2"
 description = "re/read Python Desktop: Offline Translation on Text Selection"
 requires-python = ">=3.10"
 dependencies = [

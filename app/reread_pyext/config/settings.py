@@ -51,6 +51,7 @@ class SettingsManager:
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                    model_directory = str(data.get("model_directory") or "").strip()
                     self._config = AppConfig(
                         auto_drag=data.get("auto_drag", True),
                         hold_duration_seconds=float(data.get("hold_duration_seconds", 2.0)),
@@ -63,8 +64,8 @@ class SettingsManager:
                         start_on_boot=data.get("start_on_boot", False),
                         target_lang=data.get("target_lang", "vi"),
                         ui_language=data.get("ui_language") if data.get("ui_language") in ("vi", "en") else "vi",
-                        model_directory=str(data.get("model_directory") or ""),
-                        setup_complete=bool(data.get("setup_complete", False)),
+                        model_directory=model_directory,
+                        setup_complete=bool(data.get("setup_complete", bool(model_directory))),
                     )
 
             except Exception as e:

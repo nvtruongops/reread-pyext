@@ -30,7 +30,7 @@ ShowLanguageDialog=yes
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion=0.1.1.0
+VersionInfoVersion=0.1.2.0
 VersionInfoDescription=re/read Desktop Installer
 VersionInfoProductName=re/read Desktop
 
