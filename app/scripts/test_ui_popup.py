@@ -165,6 +165,31 @@ def main() -> int:
         models = ModelRegistryManager(models_dir=data / "models")
 
         window = MainWindow(settings, history, logger, models, tray_available=False)
+        window.settings_page._show_update_result(UpdateCheckResult(
+            latest_version="0.1.7",
+            release_url="https://github.com/nvtruongops/reread-pyext/releases/tag/v0.1.7",
+            update_available=True,
+            installer_url="https://github.com/nvtruongops/reread-pyext/releases/download/v0.1.7/reread_pyext_setup.exe",
+            installer_sha256="a" * 64,
+            installer_size=100,
+        ))
+        assert window.settings_page.check_update_button.text() == "Cập nhật ngay"
+        assert not window.settings_page.open_release_button.isHidden()
+        restart_events = []
+        window.restart_requested.connect(lambda: restart_events.append(True))
+        window.settings_page.startup.is_registered = lambda: (False, None, None)
+        expected_auto_drag = not settings.config.auto_drag
+        window.settings_page.auto_drag.setChecked(expected_auto_drag)
+        window.settings_page.restart_button.click()
+        assert settings.config.auto_drag is expected_auto_drag
+        assert SettingsManager(config_path=data / "config.json").config.auto_drag is settings.config.auto_drag
+        assert restart_events == [True]
+        window.settings_page.auto_drag.setChecked(not settings.config.auto_drag)
+        with patch.object(settings, "update", return_value=False):
+            window.settings_page.restart_button.click()
+        assert restart_events == [True]
+        assert window.settings_page.is_dirty
+        window.settings_page.load()
         window.set_status("Đang hoạt động · dịch ngoại tuyến", ready=True)
         window.show()
         app.processEvents()
@@ -208,18 +233,19 @@ def main() -> int:
         assert [window.settings_page.ui_language.itemData(i) for i in range(window.settings_page.ui_language.count())] == ["vi", "en"]
         assert window.settings_page.restart_button.isEnabled()
         assert window.settings_page.uninstall_button.text() == "Gỡ cài đặt"
-        assert window.settings_page.version_label.text() == "Phiên bản: v0.1.6"
-        assert window.settings_page.check_update_button.text() == "Kiểm tra cập nhật"
+        assert window.settings_page.version_label.text() == "Phiên bản: v0.1.7"
+        assert window.settings_page.check_update_button.text() == "Cập nhật ngay"
         window.settings_page._show_update_result(UpdateCheckResult(
             "0.2.0", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.2.0", True
         ))
         assert not window.settings_page.open_release_button.isHidden()
         assert "v0.2.0" in window.settings_page.update_status.text()
         window.settings_page._show_update_result(UpdateCheckResult(
-            "0.1.6", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.1.6", False
+            "0.1.7", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.1.7", False
         ))
         assert window.settings_page.open_release_button.isHidden()
         assert "mới nhất" in window.settings_page.update_status.text()
+        assert window.settings_page.check_update_button.text() == "Kiểm tra cập nhật"
         window.settings_page.check_update_button.setEnabled(False)
         window.settings_page._show_update_error()
         assert window.settings_page.check_update_button.isEnabled()
@@ -230,7 +256,7 @@ def main() -> int:
         assert restart_requests == [True]
         original_auto_drag = window.settings_page.auto_drag.isChecked()
         window.settings_page.auto_drag.setChecked(not original_auto_drag)
-        assert not window.settings_page.restart_button.isEnabled()
+        assert window.settings_page.restart_button.isEnabled()
         window.settings_page.auto_drag.setChecked(original_auto_drag)
         assert window.settings_page.restart_button.isEnabled()
 
@@ -637,7 +663,7 @@ def main() -> int:
         assert english_window.page_title.text() == "Translate"
         assert english_window.home.install_models_button.text() == "Get models"
         assert english_window.settings_page.ui_language.currentData() == "en"
-        assert english_window.settings_page.version_label.text() == "Version: v0.1.6"
+        assert english_window.settings_page.version_label.text() == "Version: v0.1.7"
         assert english_window.settings_page.check_update_button.text() == "Check for updates"
         assert english_window.settings_page.restart_button.text() == "Restart"
         assert english_window.settings_page.uninstall_button.text() == "Uninstall"

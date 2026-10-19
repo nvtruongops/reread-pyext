@@ -72,6 +72,26 @@ class AppStartupTests(unittest.TestCase):
             "--background",
         ])
 
+    def test_verified_update_installer_uses_saved_language_and_restarts_after_install(self):
+        app = SimpleNamespace(
+            settings_mgr=SimpleNamespace(config=SimpleNamespace(ui_language="en")),
+            main_window=SimpleNamespace(settings_page=Mock()),
+            logger=Mock(),
+            shutdown=Mock(),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            installer = Path(directory) / "reread_pyext_setup.exe"
+            installer.write_bytes(b"verified setup")
+            with patch.object(desktop_app.sys, "frozen", True, create=True), patch.object(desktop_app.subprocess, "Popen") as popen:
+                desktop_app.RereadDesktopApp.install_update(app, str(installer))
+
+        command, = popen.call_args.args
+        self.assertEqual(command[0], str(installer.resolve()))
+        self.assertIn("/LANG=en", command)
+        self.assertIn(f"/DIR={Path(sys.executable).resolve().parent}", command)
+        self.assertIn("/RESTARTAPP=1", command)
+        app.shutdown.assert_called_once_with()
+
     def test_cancelling_first_run_setup_exits_before_logging_or_kernel_startup(self):
         fake_application = Mock()
         settings = SimpleNamespace(config=SimpleNamespace(setup_complete=False))

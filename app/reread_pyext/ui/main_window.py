@@ -50,7 +50,7 @@ from ..config.startup import StartupManager
 from ..logger import AppLogger
 from ..paths import app_data_dir, models_dir, resource_path
 from .. import __version__
-from ..update_checker import UpdateCheckResult, check_for_update
+from ..update_checker import UpdateCheckResult, check_for_update, download_installer
 from .translations import localize_widgets, set_ui_language, translate, ui_language
 
 
@@ -859,6 +859,10 @@ class SettingsPage(QWidget):
     restart_requested = Signal()
     update_check_complete = Signal(object)
     update_check_failed = Signal()
+    update_download_complete = Signal(str)
+    update_download_failed = Signal(str)
+    update_download_progress = Signal(int, int)
+    update_install_requested = Signal(str)
 
     def __init__(self, settings: SettingsManager) -> None:
         super().__init__()
@@ -869,6 +873,7 @@ class SettingsPage(QWidget):
         self._loading = False
         self._saved_values: dict[str, object] = {}
         self._startup_registered = False
+        self._latest_update: UpdateCheckResult | None = None
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -976,7 +981,7 @@ class SettingsPage(QWidget):
 
         updates, updates_layout = _card(
             "Cập nhật ứng dụng",
-            "Kiểm tra bản phát hành ổn định trên GitHub. Ứng dụng không tự tải hoặc cài đặt bản mới.",
+            "Kiểm tra bản phát hành ổn định trên GitHub. Khi có bản mới, chọn Cập nhật ngay để tải và cài đặt.",
         )
         self.version_label = QLabel(f"{translate('Phiên bản')}: v{__version__}")
         self.update_status = QLabel("Chưa kiểm tra cập nhật.")
@@ -985,7 +990,7 @@ class SettingsPage(QWidget):
         update_actions = QHBoxLayout()
         self.check_update_button = QPushButton("Kiểm tra cập nhật")
         self.check_update_button.setObjectName("primaryButton")
-        self.check_update_button.clicked.connect(self._check_for_updates)
+        self.check_update_button.clicked.connect(self._on_update_action)
         self.open_release_button = QPushButton("Xem bản phát hành trên GitHub")
         self.open_release_button.hide()
         self.open_release_button.clicked.connect(self._open_latest_release)
@@ -1023,8 +1028,8 @@ class SettingsPage(QWidget):
         self.feedback.setObjectName("muted")
         self.restart_button = QPushButton("Khởi động lại")
         self.restart_button.setObjectName("quietButton")
-        self.restart_button.setToolTip(translate("Khởi động lại ứng dụng và dịch vụ để áp dụng cấu hình đã lưu."))
-        self.restart_button.clicked.connect(self.restart_requested.emit)
+        self.restart_button.setToolTip(translate("Lưu thay đổi rồi khởi động lại ứng dụng và dịch vụ."))
+        self.restart_button.clicked.connect(self._request_restart)
         self.undo_button = QPushButton("Hoàn tác")
         self.undo_button.setObjectName("quietButton")
         self.undo_button.clicked.connect(self._undo)
@@ -1054,7 +1059,16 @@ class SettingsPage(QWidget):
         self.start_on_boot.toggled.connect(self._refresh_startup_status)
         self.update_check_complete.connect(self._show_update_result)
         self.update_check_failed.connect(self._show_update_error)
+        self.update_download_complete.connect(self._on_update_downloaded)
+        self.update_download_failed.connect(self._show_download_error)
+        self.update_download_progress.connect(self._show_download_progress)
         self.load()
+
+    def _on_update_action(self) -> None:
+        if self._latest_update is not None:
+            self._download_update(self._latest_update)
+        else:
+            self._check_for_updates()
 
     def _check_for_updates(self) -> None:
         self.check_update_button.setEnabled(False)
@@ -1070,6 +1084,10 @@ class SettingsPage(QWidget):
 
     def _show_update_result(self, result: UpdateCheckResult) -> None:
         self.check_update_button.setEnabled(True)
+        self._latest_update = result if result.update_available else None
+        self.check_update_button.setText(
+            translate("Cập nhật ngay") if result.update_available else translate("Kiểm tra cập nhật")
+        )
         self._latest_release_url = result.release_url if result.update_available else ""
         self.open_release_button.setVisible(result.update_available)
         if result.update_available:
@@ -1077,8 +1095,47 @@ class SettingsPage(QWidget):
         else:
             self.update_status.setText(f"{translate('Bạn đang dùng phiên bản mới nhất.')} (v{__version__})")
 
+    def _download_update(self, result: UpdateCheckResult) -> None:
+        self.check_update_button.setEnabled(False)
+        self.update_status.setText(translate("Đang tải và xác minh bản cập nhật…"))
+
+        def download() -> None:
+            try:
+                installer = download_installer(
+                    result,
+                    progress=lambda received, total: self.update_download_progress.emit(received, total),
+                )
+                self.update_download_complete.emit(str(installer))
+            except Exception as exc:
+                self.update_download_failed.emit(str(exc))
+
+        threading.Thread(target=download, name="reread-update-download", daemon=True).start()
+
+    def _show_download_progress(self, received: int, total: int) -> None:
+        percentage = min(100, received * 100 // max(1, total))
+        self.update_status.setText(
+            f"{translate('Đang tải và xác minh bản cập nhật…')} {percentage}%"
+        )
+
+    def _on_update_downloaded(self, installer_path: str) -> None:
+        self.update_status.setText(translate("Đang cài đặt cập nhật và khởi động lại ứng dụng…"))
+        self.update_install_requested.emit(installer_path)
+
+    def _show_download_error(self, message: str) -> None:
+        self.check_update_button.setEnabled(True)
+        self.check_update_button.setText(translate("Cập nhật ngay"))
+        self.update_status.setText(
+            f"{translate('Không thể tải hoặc xác minh bản cập nhật: ')}{message}"
+        )
+
+    def show_update_install_error(self, message: str) -> None:
+        self.check_update_button.setEnabled(True)
+        self.update_status.setText(f"{translate('Không thể chạy bộ cài cập nhật: ')}{message}")
+
     def _show_update_error(self) -> None:
         self.check_update_button.setEnabled(True)
+        self.check_update_button.setText(translate("Kiểm tra cập nhật"))
+        self._latest_update = None
         self.open_release_button.hide()
         self.update_status.setText(translate("Không thể kiểm tra cập nhật. Hãy kiểm tra kết nối mạng rồi thử lại."))
 
@@ -1157,7 +1214,7 @@ class SettingsPage(QWidget):
         self.dirty_status.style().polish(self.dirty_status)
         self.save_button.setEnabled(dirty)
         self.undo_button.setEnabled(dirty)
-        self.restart_button.setEnabled(not dirty)
+        self.restart_button.setEnabled(True)
         if dirty:
             self.feedback.clear()
 
@@ -1177,7 +1234,12 @@ class SettingsPage(QWidget):
         self.load()
         self.feedback.setText(translate("Đã hoàn tác thay đổi."))
 
-    def _save(self) -> None:
+    def _request_restart(self) -> None:
+        if self.is_dirty and not self._save():
+            return
+        self.restart_requested.emit()
+
+    def _save(self) -> bool:
         model_directory = models_dir(self.model_directory.text().strip()).resolve()
         current_model_directory = models_dir(self.settings.config.model_directory).resolve()
         model_directory_changed = model_directory != current_model_directory
@@ -1194,7 +1256,7 @@ class SettingsPage(QWidget):
             warning.addButton(translate("Đóng"), QMessageBox.ButtonRole.AcceptRole)
             _style_message_box(warning)
             warning.exec()
-            return
+            return False
 
         wants_startup = self.start_on_boot.isChecked()
         registered, _name, _command = self.startup.is_registered()
@@ -1213,11 +1275,13 @@ class SettingsPage(QWidget):
             _style_message_box(warning)
             warning.exec()
             self.start_on_boot.setChecked(self.settings.config.start_on_boot)
-            return
+            return False
 
         values = self._form_values()
         values["model_directory"] = str(model_directory)
-        self.settings.update(**values)
+        if not self.settings.update(**values):
+            self.feedback.setText(translate("Không thể lưu cài đặt. Kiểm tra quyền ghi vào thư mục dữ liệu."))
+            return False
         self.saved.emit(self.settings.config)
         self.load()
         if language_changed:
@@ -1231,6 +1295,7 @@ class SettingsPage(QWidget):
         if model_directory_changed:
             message += translate(" Mở lại ứng dụng để dùng thư mục mô hình mới.")
         self.feedback.setText(message)
+        return True
 
     def _choose_model_directory(self) -> None:
         current = Path(self.model_directory.text()).expanduser()
@@ -1325,6 +1390,7 @@ class MainWindow(QMainWindow):
     quit_requested = Signal()
     restart_requested = Signal()
     uninstall_requested = Signal()
+    update_install_requested = Signal(str)
 
     def __init__(
         self,
@@ -1434,6 +1500,7 @@ class MainWindow(QMainWindow):
         self.home.settings_requested.connect(lambda: self.show_page(PAGE_SETTINGS))
         self.settings_page.restart_requested.connect(self.restart_requested.emit)
         self.settings_page.uninstall_requested.connect(self.uninstall_requested.emit)
+        self.settings_page.update_install_requested.connect(self.update_install_requested.emit)
         localize_widgets(self)
 
     def show_page(self, index: int) -> None:

@@ -86,11 +86,11 @@ class SettingsManager:
             print(f"[SettingsManager] Error saving config: {e}", flush=True)
             return False
 
-    def update(self, **kwargs) -> None:
+    def update(self, **kwargs) -> bool:
         for k, v in kwargs.items():
             if hasattr(self._config, k):
                 setattr(self._config, k, v)
-        self.save()
+        return self.save()
 
     def complete_first_run_setup(
         self,

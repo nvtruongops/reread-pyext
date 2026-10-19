@@ -30,7 +30,7 @@ ShowLanguageDialog=yes
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion=0.1.6.0
+VersionInfoVersion={#AppVersion}.0
 VersionInfoDescription=re/read Desktop Installer
 VersionInfoProductName=re/read Desktop
 
@@ -57,12 +57,18 @@ Name: "{autodesktop}\re/read Desktop"; Filename: "{app}\reread_pyext.exe"; Tasks
 Name: "desktopicon"; Description: "{cm:CreateDesktopShortcut}"; Flags: unchecked
 
 [Run]
-Filename: "{app}\reread_pyext.exe"; Parameters: "--ui-language={language}"; Description: "{cm:LaunchApp}"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\reread_pyext.exe"; Parameters: "--ui-language={language}"; Description: "{cm:LaunchApp}"; Flags: postinstall nowait skipifsilent; Check: not IsAutomaticUpdate
+Filename: "{app}\reread_pyext.exe"; Parameters: "--ui-language={language}"; Flags: nowait; Check: IsAutomaticUpdate
 
 [UninstallRun]
 Filename: "{app}\reread_pyext.exe"; Parameters: "--uninstall-cleanup"; RunOnceId: "RereadRemoveUserData"; Flags: waituntilterminated skipifdoesntexist
 
 [Code]
+function IsAutomaticUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:RESTARTAPP|0}') = '1';
+end;
+
 function InitializeUninstall: Boolean;
 begin
   Result := True;

@@ -127,6 +127,7 @@ class RereadDesktopApp(QObject):
         self.main_window.quit_requested.connect(self.shutdown)
         self.main_window.restart_requested.connect(self.restart)
         self.main_window.uninstall_requested.connect(self.start_uninstaller)
+        self.main_window.update_install_requested.connect(self.install_update)
         self.main_window.manual_translation_requested.connect(self._handle_manual_translation)
         self.settings_mgr.add_listener(self._on_settings_updated)
 
@@ -296,6 +297,47 @@ class RereadDesktopApp(QObject):
     @Slot()
     def restart(self) -> None:
         self._restart_requested = True
+        self.shutdown()
+
+    @Slot(str)
+    def install_update(self, installer_path: str) -> None:
+        installer = Path(installer_path).resolve()
+        if not installer.is_file():
+            message = translate("Không tìm thấy bộ cài cập nhật đã tải.")
+            self.main_window.settings_page.show_update_install_error(message)
+            QMessageBox.warning(self.main_window, translate("Cập nhật ứng dụng"), message)
+            return
+        if not (getattr(sys, "frozen", False) or "__compiled__" in globals()):
+            message = translate("Cập nhật tự động chỉ dùng trong bản đã cài đặt.")
+            self.main_window.settings_page.show_update_install_error(message)
+            QMessageBox.warning(self.main_window, translate("Cập nhật ứng dụng"), message)
+            return
+
+        executable_directory = Path(sys.executable).resolve().parent
+        command = [
+            str(installer),
+            "/SP-",
+            "/SILENT",
+            "/NORESTART",
+            f"/LANG={self.settings_mgr.config.ui_language}",
+            f"/DIR={executable_directory}",
+            "/RESTARTAPP=1",
+        ]
+        try:
+            subprocess.Popen(command, cwd=installer.parent)
+        except OSError as exc:
+            installer.unlink(missing_ok=True)
+            self.logger.error(f"Could not launch the update installer: {exc}")
+            message = str(exc)
+            self.main_window.settings_page.show_update_install_error(message)
+            QMessageBox.warning(
+                self.main_window,
+                translate("Cập nhật ứng dụng"),
+                translate("Không thể chạy bộ cài cập nhật: ") + message,
+            )
+            return
+
+        self.logger.info("Starting verified application update.")
         self.shutdown()
 
     def start_uninstaller(self) -> None:
