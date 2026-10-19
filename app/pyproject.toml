@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reread-pyext"
+version = "0.1.0"
+description = "re/read Python Desktop: Offline Translation on Text Selection"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "pydantic>=2.0.0",
+    "PySide6-Essentials>=6.10",
+    "pywin32>=306; sys_platform == 'win32'",
+]
+
+[project.scripts]
+reread-desktop = "reread_pyext.app:main"
+reread-kernel = "reread_pyext.kernel.server:run_server"
+
+[project.optional-dependencies]
+desktop-build = ["PySide6==6.12.0", "Nuitka==4.1.1", "ziglang==0.16.0"]
+
+[tool.setuptools.packages.find]
+include = ["reread_pyext*"]
+
+[tool.pyside6.deploy]
+title = "reread_pyext"
+input_file = "desktop_main.py"
+exec_directory = "dist"
+icon = "assets/icon.ico"
+mode = "standalone"
+extra_args = "--windows-console-mode=disable --zig --assume-yes-for-downloads --include-data-file=assets/icon.ico=assets/icon.ico --include-data-dir=data/bergamot=data/bergamot --include-data-file=data/models/registry.json=data/models/registry.json --include-data-file=data/registry.json=data/registry.json --include-data-file=reread_pyext/kernel/bergamot_worker.cjs=reread_pyext/kernel/bergamot_worker.cjs"

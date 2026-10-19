@@ -1,0 +1,31 @@
+# Local tooling and build output
+.codegraph/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+/app/dist/
+/app/build/
+/app/deployment/
+/app/.venv-build/
+/app/runtime/node.exe
+
+# Local and previously bundled user data
+/app/data/config.json
+/app/data/history.json
+/app/data/app.log
+/app/data/*.sqlite3
+/app/data/models/*
+!/app/data/models/registry.json
+/app/data/dictionaries/
+/data/config.json
+/data/history.json
+/data/app.log
+/data/models/*
+!/data/models/registry.json
+/data/dictionaries/
+
+.env
+.env.*
+!.env.example
