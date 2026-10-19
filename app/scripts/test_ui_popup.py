@@ -208,7 +208,7 @@ def main() -> int:
         assert [window.settings_page.ui_language.itemData(i) for i in range(window.settings_page.ui_language.count())] == ["vi", "en"]
         assert window.settings_page.restart_button.isEnabled()
         assert window.settings_page.uninstall_button.text() == "Gỡ cài đặt"
-        assert window.settings_page.version_label.text() == "Phiên bản: v0.1.5"
+        assert window.settings_page.version_label.text() == "Phiên bản: v0.1.6"
         assert window.settings_page.check_update_button.text() == "Kiểm tra cập nhật"
         window.settings_page._show_update_result(UpdateCheckResult(
             "0.2.0", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.2.0", True
@@ -216,7 +216,7 @@ def main() -> int:
         assert not window.settings_page.open_release_button.isHidden()
         assert "v0.2.0" in window.settings_page.update_status.text()
         window.settings_page._show_update_result(UpdateCheckResult(
-            "0.1.5", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.1.5", False
+            "0.1.6", "https://github.com/nvtruongops/reread-pyext/releases/tag/v0.1.6", False
         ))
         assert window.settings_page.open_release_button.isHidden()
         assert "mới nhất" in window.settings_page.update_status.text()
@@ -637,7 +637,7 @@ def main() -> int:
         assert english_window.page_title.text() == "Translate"
         assert english_window.home.install_models_button.text() == "Get models"
         assert english_window.settings_page.ui_language.currentData() == "en"
-        assert english_window.settings_page.version_label.text() == "Version: v0.1.5"
+        assert english_window.settings_page.version_label.text() == "Version: v0.1.6"
         assert english_window.settings_page.check_update_button.text() == "Check for updates"
         assert english_window.settings_page.restart_button.text() == "Restart"
         assert english_window.settings_page.uninstall_button.text() == "Uninstall"

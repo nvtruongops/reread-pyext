@@ -63,6 +63,8 @@ class RereadDesktopApp(QObject):
             if setup_dialog.exec() != QDialog.DialogCode.Accepted:
                 self._setup_cancelled = True
                 return
+        elif initial_language in ("vi", "en"):
+            self.settings_mgr.update(ui_language=initial_language)
         set_ui_language(self.settings_mgr.config.ui_language)
 
         self.logger: AppLogger = setup_global_logging()

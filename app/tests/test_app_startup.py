@@ -1,5 +1,6 @@
 import unittest
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -7,10 +8,49 @@ from unittest.mock import Mock, patch
 from PySide6.QtCore import QCoreApplication, QObject, Qt
 
 from reread_pyext import app as desktop_app
+from reread_pyext.config.settings import SettingsManager
 from reread_pyext.hook import selection_hook
 
 
 class AppStartupTests(unittest.TestCase):
+    def test_installer_language_overrides_saved_language_after_setup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / "config.json"
+            model_directory = Path(directory) / "models"
+            settings = SettingsManager(config_path)
+            settings.update(
+                setup_complete=True,
+                ui_language="en",
+                model_directory=str(model_directory),
+            )
+            fake_application = Mock()
+
+            with patch.object(desktop_app, "QApplication") as qt_application, \
+                 patch.object(desktop_app, "migrate_legacy_data", return_value=[]), \
+                 patch.object(desktop_app, "SettingsManager", return_value=settings), \
+                 patch.object(desktop_app, "setup_global_logging"), \
+                 patch.object(desktop_app, "HistoryManager"), \
+                 patch.object(desktop_app, "ModelRegistryManager"), \
+                 patch.object(desktop_app, "TranslationKernel"), \
+                 patch.object(desktop_app, "SelectionHook"), \
+                 patch.object(desktop_app, "MainWindow"), \
+                 patch.object(desktop_app, "FloatingTooltip"), \
+                 patch.object(desktop_app, "QSystemTrayIcon") as tray_type, \
+                 patch.object(desktop_app, "QMenu"), \
+                 patch.object(desktop_app, "QAction"), \
+                 patch.object(desktop_app, "resource_path", return_value=Path(directory) / "missing.ico"), \
+                 patch.object(desktop_app, "node_executable", return_value="node"), \
+                 patch.object(desktop_app.RereadDesktopApp, "_start_kernel"):
+                qt_application.instance.return_value = fake_application
+                tray_type.isSystemTrayAvailable.return_value = False
+
+                desktop_app.RereadDesktopApp(initial_language="vi")
+
+            reloaded = SettingsManager(config_path)
+            self.assertEqual(reloaded.config.ui_language, "vi")
+            self.assertTrue(reloaded.config.setup_complete)
+            self.assertEqual(reloaded.config.model_directory, str(model_directory))
+
     def test_restart_relaunches_source_app_with_background_and_qt_arguments(self):
         app = SimpleNamespace(
             _setup_cancelled=False,
